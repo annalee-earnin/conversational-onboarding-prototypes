@@ -1,0 +1,2546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Conversational Onboarding – Account Creation v1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      background: #FBEA6B;
+    }
+
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .phone {
+      position: fixed;
+      inset: 0;
+      background: #FBEA6B;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      flex-shrink: 0;
+      height: 54px;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 32px 8px;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-bar .time { font-size: 15px; font-weight: 700; }
+    .status-bar .icons { display: flex; gap: 6px; align-items: center; }
+
+    /* ── Nav bar ── */
+    .nav-bar {
+      flex-shrink: 0;
+      padding-top: env(safe-area-inset-top);
+      height: calc(64px + env(safe-area-inset-top));
+      display: flex;
+      align-items: center;
+      padding-left: 32px;
+      padding-right: 32px;
+      justify-content: space-between;
+      background: transparent;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #000;
+    }
+    .nav-logo .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: #fff;
+      border-radius: 6px;
+      padding: 2px 5px;
+      font-size: 14px;
+      font-weight: 700;
+      margin-left: 1px;
+    }
+    .verify-card-bubble {
+      background: #fff;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .verify-card-bubble.visible { opacity: 1; transform: translateY(0); }
+    .verify-card-row { display: flex; flex-direction: column; gap: 3px; }
+    .verify-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(0,0,0,0.38);
+    }
+    .verify-card-value {
+      font-size: 15px;
+      font-weight: 500;
+      color: #000;
+    }
+    .verify-card-edit-btn {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .verify-card-edit-btn:active { background: rgba(0,0,0,0.12); }
+
+    /* ── Inline edit card (shown over the input area) ── */
+    .verify-edit-card {
+      background: #fff;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .verify-edit-row {
+      padding: 12px 20px 14px;
+    }
+    .verify-edit-row + .verify-edit-row { border-top: 1px solid #f0f0f0; }
+    .verify-edit-input {
+      display: block;
+      width: 100%;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      color: #000;
+      background: transparent;
+      padding: 4px 0 0;
+      caret-color: #000;
+    }
+    .verify-edit-input::placeholder { color: rgba(0,0,0,0.3); }
+    .verify-card-divider {
+      height: 1px;
+      background: #f0f0f0;
+      margin: 0 -20px;
+    }
+
+    .bubble-gif {
+      align-self: flex-start;
+      max-width: 220px;
+      margin: 4px 0;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .bubble-gif.visible { opacity: 1; transform: translateY(0); }
+    .bubble-gif img {
+      display: block;
+      width: 220px;
+      height: auto;
+      border-radius: 18px;
+    }
+
+    .success-cta {
+      display: block;
+      width: 100%;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      padding: 16px 24px;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .success-cta:active { opacity: 0.8; }
+
+    .restart-btn {
+      background: none;
+      border: none;
+      padding: 8px 0;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: #000;
+      cursor: pointer;
+      opacity: 0.5;
+    }
+
+    /* ── Chat area ── */
+    .chat-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-anchor: none;
+      position: relative;
+      padding: 16px 32px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      scrollbar-width: none;
+    }
+    .chat-scroll::-webkit-scrollbar { display: none; }
+    .chat-scroll::after {
+      content: '';
+      display: block;
+      flex-shrink: 0;
+      height: 60vh;
+    }
+
+    .bubble-bot {
+      font-size: 20px;
+      line-height: 28px;
+      color: rgba(0,0,0,0.92);
+      max-width: 100%;
+      white-space: pre-wrap;
+    }
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 2px;
+    }
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      animation: typing-bounce 1.1s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+    .bubble-bot-hero .hero-heading {
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 40px;
+      letter-spacing: -0.3px;
+      color: rgba(0,0,0,0.92);
+      margin-bottom: 16px;
+    }
+    .bubble-bot-hero .hero-body {
+      font-size: 20px;
+      line-height: 28px;
+      color: rgba(0,0,0,0.92);
+    }
+    .bubble-bot-hero .hero-body p + p { margin-top: 12px; }
+    .bubble-user {
+      scroll-margin-top: 16px;
+      align-self: flex-end;
+      background: rgba(0,0,0,0.76);
+      color: #fff;
+      padding: 8px 24px;
+      border-radius: 16px 16px 0 16px;
+      font-size: 16px;
+      line-height: 24px;
+      max-width: 234px;
+      word-break: break-word;
+    }
+
+    .bubble-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      scroll-margin-top: 16px;
+    }
+    .bubble-user-row .bubble-user {
+      scroll-margin-top: 0;
+    }
+    .bubble-edit-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      padding: 0;
+    }
+
+    /* ── Name edit sheet ── */
+    .name-sheet-input {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-family: inherit;
+      font-size: 16px;
+      outline: none;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+    .name-sheet-input:focus { border-color: #000; }
+    .name-sheet-cta {
+      width: 100%;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      padding: 16px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .name-sheet-cta:disabled { opacity: 0.35; }
+
+    /* ── Quick replies ── */
+    .quick-replies {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 0 0 24px;
+    }
+    .quick-reply-btn {
+      background: transparent;
+      border: 1.5px solid rgba(0,0,0,0.76);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 500;
+      cursor: pointer;
+      color: rgba(0,0,0,0.92);
+      font-family: inherit;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    @media (hover: hover) {
+      .quick-reply-btn:hover { background: rgba(0,0,0,0.06); }
+    }
+    .quick-reply-btn--primary {
+      background: rgba(0,0,0,0.76);
+      color: #fff;
+      border-color: transparent;
+    }
+    @media (hover: hover) {
+      .quick-reply-btn--primary:hover { opacity: 0.85; background: rgba(0,0,0,0.76); }
+    }
+
+    /* ── Bottom card area ── */
+    .card-area {
+      flex-shrink: 0;
+      padding: 0 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: #FBEA6B;
+      position: relative;
+    }
+
+    /* Gradient fade above card area */
+    .card-area-gradient {
+      position: absolute;
+      top: -48px;
+      left: 0;
+      right: 0;
+      height: 48px;
+      background: linear-gradient(to bottom, transparent, #FBEA6B);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Wrapper that holds chatScroll + the hint button */
+    .chat-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scroll-to-end hint button — lives inside .chat-wrap, above card area */
+    .scroll-hint-btn {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1.5px solid rgba(0,0,0,0.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 3;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+    .scroll-hint-btn.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .card-label {
+      font-size: 17px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    /* ── Text input card ── */
+    .text-input-card {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      background: rgba(46, 64, 217, 0.04);
+      border-radius: 8px;
+      box-shadow: none;
+      padding: 10px 10px 10px 16px;
+      margin: 12px 0;
+    }
+    .text-input-card input[type="text"],
+    .text-input-card input[type="email"],
+    .text-input-card input[type="tel"] {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      padding: 4px 0;
+      font-size: 17px;
+      line-height: 22px;
+      letter-spacing: -0.2px;
+      outline: none;
+      font-family: inherit;
+      color: #1a1a1a;
+      background: transparent;
+      border-radius: 0;
+    }
+    .text-input-card input::placeholder {
+      color: #646872;
+    }
+    .text-input-card .send-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .text-input-card .send-btn:disabled { background: rgba(0,0,0,0.08); }
+    .text-input-card .send-btn:disabled svg path { stroke: rgba(0,0,0,0.25); }
+    .text-input-card .send-btn.hidden { display: none; }
+    .text-input-card .send-btn svg { display: block; }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      width: 100%;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: inherit;
+      height: 44px;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── Date picker drum ── */
+    .date-picker {
+      display: flex;
+      gap: 0;
+      height: 216px;
+      position: relative;
+      overflow: hidden;
+    }
+    .date-picker::before,
+    .date-picker::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      height: 80px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .date-picker::before {
+      top: 0;
+      background: linear-gradient(to bottom, #fff 10%, transparent 100%);
+    }
+    .date-picker::after {
+      bottom: 0;
+      background: linear-gradient(to top, #fff 10%, transparent 100%);
+    }
+    .selection-band {
+      position: absolute;
+      top: 50%; left: 16px; right: 16px;
+      transform: translateY(-50%);
+      height: 40px;
+      border-top: 1px solid rgba(26,26,26,0.12);
+      border-bottom: 1px solid rgba(26,26,26,0.12);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .drum-col {
+      flex: 1;
+      overflow-y: scroll;
+      scrollbar-width: none;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 88px 0;
+    }
+    .drum-col::-webkit-scrollbar { display: none; }
+    .drum-col.month { flex: 2; }
+    .drum-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      color: rgba(26,26,26,0.32);
+      scroll-snap-align: center;
+      cursor: pointer;
+      transition: color 0.1s, font-weight 0.1s;
+    }
+    .drum-item.selected { color: #1a1a1a; font-weight: 600; font-size: 18px; }
+
+    /* ── OTP card ── */
+    .otp-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #111;
+    }
+    .otp-edit {
+      font-size: 14px;
+      color: #111;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 2px;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+      text-align: left;
+    }
+    .otp-boxes {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .otp-box {
+      flex: 1;
+      aspect-ratio: 1;
+      background: #f0f0f5;
+      border: 2.5px solid transparent;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: #111;
+      transition: border-color 0.15s;
+    }
+    .otp-box.active { border-color: #111; background: #fff; }
+    .otp-box.filled { background: #f0f0f5; border-color: transparent; }
+    .otp-resend {
+      font-size: 14px;
+      color: #999;
+      text-align: left;
+    }
+    .otp-resend.active {
+      color: #111;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .otp-input-hidden {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+
+    /* ── T&C card ── */
+    .tc-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .tc-checkbox {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tc-checkbox.checked { background: #111; border-color: #111; }
+    .tc-checkbox.checked::after {
+      content: "";
+      width: 12px;
+      height: 7px;
+      border-left: 2.5px solid #fff;
+      border-bottom: 2.5px solid #fff;
+      transform: rotate(-45deg) translateY(-2px);
+    }
+    .tc-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+    }
+    .tc-text a { color: #111; font-weight: 600; }
+
+    /* ── Disclosures bottom sheet ── */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .sheet-backdrop.visible { opacity: 1; pointer-events: all; }
+    .disclosures-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      z-index: 201;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .disclosures-sheet.visible { transform: translateY(0); }
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      margin: 12px auto 0;
+      flex-shrink: 0;
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 12px;
+      flex-shrink: 0;
+    }
+    .sheet-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #000;
+    }
+    .sheet-close {
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: #000;
+      font-size: 20px;
+      line-height: 1;
+    }
+    .sheet-body {
+      overflow-y: auto;
+      padding: 4px 24px 48px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #111;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sheet-body p { margin-bottom: 16px; }
+    .sheet-body a { color: #111; font-weight: 600; text-decoration: underline; }
+
+    /* ── Overlay card (DOB / OTP) ── */
+    #overlayCard:empty { display: none; }
+    #overlayCard {
+      position: relative;
+      z-index: 2;
+    }
+    #overlayCard .card {
+      animation: slideUp 0.2s ease-out;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Disclaimer & home indicator ── */
+    .disclaimer {
+      text-align: center;
+      font-size: 12px;
+      color: #646872;
+      padding: 8px 0;
+      letter-spacing: -0.25px;
+    }
+    .home-indicator {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .home-indicator-bar {
+      width: 134px;
+      height: 5px;
+      background: #111;
+      border-radius: 3px;
+      opacity: 0.18;
+    }
+  </style>
+</head>
+<body>
+<div class="phone">
+  <!-- Nav -->
+  <div class="nav-bar">
+    <img class="nav-logo" src="Logo.svg" alt="EarnIn" height="32">
+    <button class="restart-btn" id="restartBtn">Restart chat</button>
+  </div>
+
+  <!-- Chat messages -->
+  <div class="chat-wrap">
+    <div class="chat-scroll" id="chatScroll"></div>
+    <button class="scroll-hint-btn" id="scrollHintBtn" aria-label="Scroll to see full message">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 3v10M4 9l5 5 5-5" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Bottom card -->
+  <div class="card-area" id="cardArea">
+    <div class="card-area-gradient"></div>
+    <div id="activeCard"></div>
+    <div id="overlayCard"></div>
+    <div class="disclaimer">Responses generated by AI</div>
+  </div>
+</div>
+
+<!-- Disclosures bottom sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="disclosures-sheet" id="disclosuresSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Disclosures</span>
+    <button class="sheet-close" id="sheetClose">&#x2715;</button>
+  </div>
+  <div class="sheet-body">
+    <p>EarnIn is a financial technology company, not a bank. Banking services are provided by our bank partners on certain products other than Cash Out.</p>
+    <p><sup>1</sup> A pay period is the time between your paychecks, such as weekly, biweekly, or monthly. EarnIn determines your daily and pay period limits ("Daily Max" and "Pay Period Max") based on your income and financial risk factors as outlined in the <a href="#">Cash Out Maxes</a> section of our <a href="#">Cash Out User Agreement</a>. EarnIn reserves the right to adjust the Daily Max and Pay Period Max at its discretion. Your actual Daily Max will be displayed in your EarnIn account before each Cash Out.</p>
+    <p>EarnIn does not charge interest on Cash Outs or mandatory fees for standard transfers, which usually take 1–2 business days. For faster transfers, you can choose the Lightning Speed option and pay a fee to receive funds within 30 minutes. Lightning Speed is not available in all states. Restrictions and terms apply; see the <a href="#">Lightning Speed Fee Table</a> and <a href="#">Cash Out User Agreement</a> for details and eligibility requirements. Tips are optional and do not affect the quality or availability of services.</p>
+    <p><sup>2</sup> Lightning Speed is an optional service that allows you to expedite the transfer of funds for a fee. Depending on the product, the fee may be charged by EarnIn or its banking partner. Lightning Speed is not available in all states. Restrictions and terms apply. See the <a href="#">Lightning Speed Fee Table</a> and <a href="#">Cash Out User Agreement</a> for details.</p>
+  </div>
+</div>
+
+<!-- Name edit bottom sheet -->
+<div class="sheet-backdrop" id="nameEditBackdrop"></div>
+<div class="disclosures-sheet" id="nameEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit name</span>
+    <button class="sheet-close" id="nameEditClose">&#x2715;</button>
+  </div>
+  <div style="padding: 8px 24px 48px;">
+    <input class="name-sheet-input" id="nameEditInput" type="text" placeholder="First and last name">
+    <button class="name-sheet-cta" id="nameEditContinue" disabled>Save</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="phoneEditBackdrop"></div>
+<div class="disclosures-sheet" id="phoneEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit phone number</span>
+    <button class="sheet-close" id="phoneEditClose">&#x2715;</button>
+  </div>
+  <div style="padding: 8px 24px 48px;">
+    <input class="name-sheet-input" id="phoneEditInput" type="tel" placeholder="(555) 555-5555">
+    <button class="name-sheet-cta" id="phoneEditSave" disabled>Save</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="emailEditBackdrop"></div>
+<div class="disclosures-sheet" id="emailEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit email</span>
+    <button class="sheet-close" id="emailEditClose">&#x2715;</button>
+  </div>
+  <div style="padding: 8px 24px 48px;">
+    <input class="name-sheet-input" id="emailEditInput" type="email" placeholder="you@example.com">
+    <button class="name-sheet-cta" id="emailEditSave" disabled>Save</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="dobEditBackdrop"></div>
+<div class="disclosures-sheet" id="dobEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit date of birth</span>
+    <button class="sheet-close" id="dobEditClose">&#x2715;</button>
+  </div>
+  <div id="dobEditPickerArea" style="padding: 0 24px 48px;"></div>
+</div>
+
+<!-- Hidden OTP input -->
+<input class="otp-input-hidden" id="otpHidden" type="tel" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+<!-- Proxy input for iOS focus trick -->
+<input id="proxyInput" style="position:fixed;top:-100px;left:0;opacity:0;font-size:16px;" type="text">
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  const state = {
+    step: 0,
+    name: '',
+    dob: '',
+    phone: '',
+    email: '',
+    editingFromVerify: false,
+  };
+
+  // ── Flow definition ────────────────────────────────────────────────────
+  const flow = [
+    {
+      botMsg: "You should get paid while you work – not days or weeks later.",
+      botMsgBody: "At EarnIn, we're making this a reality.\n\nReady to access the pay you've already earned?",
+      botMsgStyle: 'hero',
+      card: 'intro',
+      options: ['Yes, I want my pay faster 💸', 'Why are paychecks every two weeks? 💡'],
+      onSubmit(val) {
+        // Skip the two educational steps if the user chose "Yes"
+        if (val === 'Yes, I want my pay faster 💸') state.step += 2;
+        return val;
+      },
+    },
+    // ── Educational turn 1 ────────────────────────────────────────────────
+    {
+      botMsg: "Moving cash to thousands of workers used to be a massive logistical operation, so batching payroll every two weeks was the only practical solution.\n\nThat system stuck around long after money went digital — which is why most people are still waiting on a 150-year-old pay cycle.",
+      card: 'intro',
+      options: ['How is EarnIn changing that?'],
+      onSubmit(val) { return val; },
+    },
+    // ── Educational pivot ─────────────────────────────────────────────────
+    {
+      botMsg: "EarnIn lets you access what you've already earned — before payday. When you tap Cash Out, you're not borrowing anything. You're just getting paid for the hours you've already worked.",
+      card: 'intro',
+      options: ['Yes, I want my pay faster 💸'],
+      onSubmit(val) { return val; },
+    },
+    // ── Cash Out intro ────────────────────────────────────────────────────
+    {
+      botMsg: "Awesome! You are on the path to real-time pay. If you need money right away, Cash Out is a great place to start. You can access money you've already earned before payday with no interest or mandatory costs.\n\nBefore we get started, here are our [disclosures](#disclosures). Feel free to ask me anything along the way.",
+      card: 'intro',
+      options: ['How does Cash Out work?', { label: 'Get started with Cash Out', primary: true }],
+      onSubmit(val) { return val; },
+    },
+    {
+      botMsg: "Perfect, let's get you set up! First, what's your legal first and last name?\n\nEnter it as it appears on your ID.",
+      card: 'text',
+      placeholder: 'First and last name',
+      inputType: 'text',
+      onSubmit(val) {
+        state.name = val;
+        return val;
+      },
+      postSubmit() {
+        const bubble = lastUserBubble;
+        if (!bubble) return;
+        const row = document.createElement('div');
+        row.className = 'bubble-user-row';
+        bubble.parentNode.insertBefore(row, bubble);
+        row.appendChild(bubble);
+        const editBtn = document.createElement('button');
+        editBtn.className = 'bubble-edit-btn';
+        editBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 1.5L12.5 4.5L4.5 12.5H1.5V9.5L9.5 1.5Z" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 3L11 6" stroke="#000" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+        row.insertBefore(editBtn, bubble);
+        editBtn.addEventListener('click', openNameEdit);
+        nameBubbleEl = bubble;
+        lastUserBubble = row;
+      },
+    },
+    {
+      botMsg: () => `Hi ${state.name.split(' ')[0]}! Let's keep going.\n\nNext up — your date of birth. I use this to confirm you meet the age requirement to use EarnIn.\n\n🔒 Your data is encrypted and never sold or shared.`,
+      saveBotBubble(el) { niceMeetYouBubble = el; },
+      card: 'date',
+      onSubmit(val) {
+        state.dob = val;
+        nameBubbleEl?.closest('.bubble-user-row')?.querySelector('.bubble-edit-btn')?.remove();
+        return val;
+      },
+      postSubmit() {
+        const bubble = lastUserBubble;
+        if (!bubble) return;
+        const row = document.createElement('div');
+        row.className = 'bubble-user-row';
+        bubble.parentNode.insertBefore(row, bubble);
+        row.appendChild(bubble);
+        const editBtn = document.createElement('button');
+        editBtn.className = 'bubble-edit-btn';
+        editBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 1.5L12.5 4.5L4.5 12.5H1.5V9.5L9.5 1.5Z" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 3L11 6" stroke="#000" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+        row.insertBefore(editBtn, bubble);
+        editBtn.addEventListener('click', openDobEdit);
+        dobBubbleEl = bubble;
+        lastUserBubble = row;
+      },
+    },
+    {
+      botMsg: () => `Perfect! What's your phone number? I'll text you a verification code.`,
+      saveBotBubble(el) { phoneBotBubble = el; },
+      card: 'text',
+      placeholder: '(555) 555-5555',
+      inputType: 'tel',
+      onSubmit(val) {
+        state.phone = val;
+        dobBubbleEl?.closest('.bubble-user-row')?.querySelector('.bubble-edit-btn')?.remove();
+        return val;
+      },
+      postSubmit() {
+        const bubble = lastUserBubble;
+        if (!bubble) return;
+        const row = document.createElement('div');
+        row.className = 'bubble-user-row';
+        bubble.parentNode.insertBefore(row, bubble);
+        row.appendChild(bubble);
+        const editBtn = document.createElement('button');
+        editBtn.className = 'bubble-edit-btn';
+        editBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 1.5L12.5 4.5L4.5 12.5H1.5V9.5L9.5 1.5Z" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 3L11 6" stroke="#000" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+        row.insertBefore(editBtn, bubble);
+        editBtn.addEventListener('click', openPhoneEdit);
+        phoneBubbleEl = bubble;
+        lastUserBubble = row;
+      },
+    },
+    {
+      botMsg: "I just texted you a 4-digit code. Enter it below to confirm your number.",
+      saveBotBubble(el) { otpPhoneBotBubble = el; },
+      card: 'otp',
+      otpType: 'phone',
+      subtitle: () => state.phone,
+      onSubmit(val) {
+        phoneBubbleEl?.closest('.bubble-user-row')?.querySelector('.bubble-edit-btn')?.remove();
+        return val;
+      },
+    },
+    {
+      preBotMsg: "✓ Phone verified! You're on a roll.",
+      botMsg: "What's your email? This will help add an extra layer of security to your account.",
+      saveBotBubble(el) { emailBotBubble = el; },
+      card: 'text',
+      placeholder: 'you@example.com',
+      inputType: 'email',
+      onSubmit(val) {
+        state.email = val;
+        return val;
+      },
+      postSubmit() {
+        const bubble = lastUserBubble;
+        if (!bubble) return;
+        const row = document.createElement('div');
+        row.className = 'bubble-user-row';
+        bubble.parentNode.insertBefore(row, bubble);
+        row.appendChild(bubble);
+        const editBtn = document.createElement('button');
+        editBtn.className = 'bubble-edit-btn';
+        editBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 1.5L12.5 4.5L4.5 12.5H1.5V9.5L9.5 1.5Z" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 3L11 6" stroke="#000" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+        row.insertBefore(editBtn, bubble);
+        editBtn.addEventListener('click', openEmailEdit);
+        emailBubbleEl = bubble;
+        lastUserBubble = row;
+      },
+    },
+    {
+      botMsg: "Got it! Check your inbox for the verification code I sent you. If you don't see it, look in your spam or junk folder.",
+      saveBotBubble(el) { otpEmailBotBubble = el; },
+      card: 'otp',
+      otpType: 'email',
+      subtitle: () => state.email,
+      onSubmit(val) {
+        emailBubbleEl?.closest('.bubble-user-row')?.querySelector('.bubble-edit-btn')?.remove();
+        return val;
+      },
+    },
+    {
+      botMsg: "Almost there — just two quick agreements to go.\n\nThe first one covers how EarnIn may contact you and confirms you're okay receiving account-related messages by text or email.",
+      card: 'tc1',
+      onSubmit(val) { return val; },
+    },
+    {
+      botMsg: "Last one.\n\nThis one covers the core rules for using the product and how your data is handled. There's also an optional opt-in to receive money tips and offers by text.",
+      card: 'tc',
+      onSubmit(val) { return val; },
+    },
+    {
+      botMsg: "Would you like to enable push notifications so I can keep you updated?",
+      card: 'quick',
+      requestPermission: true,
+      options: [{ label: 'Yes, notify me', primary: true }, 'Not now'],
+      onSubmit(val) { return val; },
+    },
+    {
+      botMsg: "One last thing. How did you hear about EarnIn?",
+      card: 'attribution',
+      onSubmit(val) { return val; },
+    },
+    {
+      gifMsg: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
+      botMsg: "🎉 Your EarnIn account is created!\n\nHere's what's next:\n\n1. Connect your bank account\n2. Verify your employment\n3. Cash Out your first advance",
+      card: 'continue',
+      onSubmit(val) { return val; },
+    },
+  ];
+
+  // ── DOM helpers ────────────────────────────────────────────────────────
+  const chatScroll = document.getElementById('chatScroll');
+  const activeCard = document.getElementById('activeCard');
+  const overlayCard = document.getElementById('overlayCard');
+
+  // Tokenise text and type it character-by-character into `el`.
+  // Handles \n\n → <br><br> and [label](url) → <a> (revealed atomically).
+  // outerEl: the top-level bubble element used to anchor scroll position.
+  // autoScroll: false for the very first message so it stays pinned at top.
+  function typeText(el, text, outerEl, autoScroll) {
+    return new Promise(resolve => {
+      const tokens = [];
+      const re = /(\n\n|\[([^\]]+)\]\(([^)]+)\))/g;
+      let pos = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        for (let i = pos; i < m.index; i++) tokens.push({ t: 'c', v: text[i] });
+        if (m[0] === '\n\n') tokens.push({ t: 'br' });
+        else tokens.push({ t: 'a', label: m[2], url: m[3] });
+        pos = m.index + m[0].length;
+      }
+      for (let i = pos; i < text.length; i++) tokens.push({ t: 'c', v: text[i] });
+
+      const charCount = tokens.filter(t => t.t === 'c').length;
+      // ~10 ms/char baseline; cap total at ~1.5 s for long messages
+      const msPerChar = charCount <= 1 ? 0 : Math.min(10, Math.max(3, 1500 / charCount));
+
+      let i = 0;
+      function tick() {
+        if (i >= tokens.length) { resolve(); return; }
+        const tok = tokens[i++];
+        if (tok.t === 'c') {
+          if (el.lastChild?.nodeType === Node.TEXT_NODE) {
+            el.lastChild.textContent += tok.v;
+          } else {
+            el.appendChild(document.createTextNode(tok.v));
+          }
+        } else if (tok.t === 'br') {
+          el.appendChild(document.createElement('br'));
+          el.appendChild(document.createElement('br'));
+        } else {
+          const a = document.createElement('a');
+          a.href = tok.url; a.target = '_blank';
+          a.style.cssText = 'color:inherit;text-decoration:underline;cursor:pointer;';
+          a.textContent = tok.label;
+          el.appendChild(a);
+        }
+        // Only scroll mid-conversation — never for the first hero message,
+        // which should stay pinned at the top as it grows.
+        if (autoScroll) {
+          const ref = outerEl || el;
+          const bottom = ref.offsetTop + ref.offsetHeight;
+          const target = bottom - chatScroll.clientHeight + 32;
+          if (target > chatScroll.scrollTop) chatScroll.scrollTop = target;
+        }
+        setTimeout(tick, msPerChar);
+      }
+      tick();
+    });
+  }
+
+  function addBotMsg(text, style, bodyText) {
+    return new Promise(resolve => {
+      // Show bouncing-dots indicator first
+      const indicator = document.createElement('div');
+      indicator.className = 'bubble-bot typing-indicator';
+      indicator.innerHTML = '<span></span><span></span><span></span>';
+      indicator.style.opacity = '0';
+      indicator.style.transform = 'translateY(6px)';
+      indicator.style.transition = 'opacity 0.2s, transform 0.2s';
+      chatScroll.appendChild(indicator);
+      if (!lastUserBubble) chatScroll.scrollTop = chatScroll.scrollHeight;
+      requestAnimationFrame(() => {
+        indicator.style.opacity = '1';
+        indicator.style.transform = 'translateY(0)';
+      });
+
+      setTimeout(async () => {
+        indicator.remove();
+
+        // Create and fade-in the bubble container
+        const el = document.createElement('div');
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(6px)';
+        el.style.transition = 'opacity 0.2s, transform 0.2s';
+        chatScroll.appendChild(el);
+        await new Promise(r => requestAnimationFrame(() => {
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+          setTimeout(r, 80);
+        }));
+
+        // Only auto-scroll mid-conversation (not the very first message)
+        const autoScroll = !!lastUserBubble;
+
+        // Type content character by character
+        if (style === 'hero') {
+          el.className = 'bubble-bot-hero';
+          const heading = document.createElement('div');
+          heading.className = 'hero-heading';
+          el.appendChild(heading);
+          await typeText(heading, text, el, autoScroll);
+          if (bodyText) {
+            const body = document.createElement('div');
+            body.className = 'hero-body';
+            el.appendChild(body);
+            for (const para of bodyText.split('\n\n')) {
+              const p = document.createElement('p');
+              body.appendChild(p);
+              await typeText(p, para, el, autoScroll);
+            }
+          }
+        } else {
+          el.className = 'bubble-bot';
+          await typeText(el, text, el, autoScroll);
+        }
+
+        updateScrollHint?.();
+        resolve(el);
+      }, 500);
+    });
+  }
+
+  let lastUserBubble = null;
+  let nameBubbleEl = null;
+  let niceMeetYouBubble = null;
+  let dobBubbleEl = null;
+  let verifyCardEl = null;
+  let phoneBotBubble = null;
+  let phoneBubbleEl = null;
+  let otpPhoneBotBubble = null;
+  let emailBubbleEl = null;
+  let emailBotBubble = null;
+  let otpEmailBotBubble = null;
+  let generation = 0;
+
+  function addUserMsg(text) {
+    const el = document.createElement('div');
+    el.className = 'bubble-user';
+    el.textContent = text;
+    chatScroll.appendChild(el);
+    lastUserBubble = el;
+  }
+
+  function addGifBubble(url) {
+    return new Promise(resolve => {
+      // Show typing indicator briefly
+      const indicator = document.createElement('div');
+      indicator.className = 'typing-indicator';
+      indicator.innerHTML = '<span></span><span></span><span></span>';
+      indicator.style.opacity = '0';
+      indicator.style.transform = 'translateY(6px)';
+      indicator.style.transition = 'opacity 0.2s, transform 0.2s';
+      chatScroll.appendChild(indicator);
+      requestAnimationFrame(() => {
+        indicator.style.opacity = '1';
+        indicator.style.transform = 'translateY(0)';
+      });
+      chatScroll.scrollTop = chatScroll.scrollHeight;
+
+      setTimeout(() => {
+        indicator.remove();
+        const el = document.createElement('div');
+        el.className = 'bubble-gif';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Celebration';
+        el.appendChild(img);
+        chatScroll.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('visible'));
+        chatScroll.scrollTop = chatScroll.scrollHeight;
+        resolve(el);
+      }, 600);
+    });
+  }
+
+  function addVerifyCardBubble() {
+    return new Promise(resolve => {
+      const indicator = document.createElement('div');
+      indicator.className = 'typing-indicator';
+      indicator.innerHTML = '<span></span><span></span><span></span>';
+      indicator.style.cssText = 'opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s;';
+      chatScroll.appendChild(indicator);
+      requestAnimationFrame(() => {
+        indicator.style.opacity='1';
+        indicator.style.transform='translateY(0)';
+        const bottom = indicator.offsetTop + indicator.offsetHeight;
+        const target = bottom - chatScroll.clientHeight + 32;
+        if (target > chatScroll.scrollTop) chatScroll.scrollTop = target;
+      });
+
+      setTimeout(() => {
+        indicator.remove();
+        const el = document.createElement('div');
+        el.className = 'verify-card-bubble';
+
+        const toTitleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
+        const nameParts = state.name.trim().split(/\s+/);
+        const first = toTitleCase(nameParts[0] || '');
+        const last = toTitleCase(nameParts.slice(1).join(' ') || '');
+
+        [
+          { label: 'First name',    value: first,     key: 'first' },
+          { label: 'Last name',     value: last,       key: 'last'  },
+          { label: 'Date of birth', value: state.dob,  key: 'dob'   },
+        ].forEach((f, i) => {
+          if (i > 0) {
+            const div = document.createElement('div');
+            div.className = 'verify-card-divider';
+            el.appendChild(div);
+          }
+          const row = document.createElement('div');
+          row.className = 'verify-card-row';
+          const lbl = document.createElement('div');
+          lbl.className = 'verify-card-label';
+          lbl.textContent = f.label;
+          const val = document.createElement('div');
+          val.className = 'verify-card-value';
+          val.dataset.key = f.key;
+          val.textContent = f.value;
+          row.appendChild(lbl);
+          row.appendChild(val);
+          el.appendChild(row);
+        });
+
+        chatScroll.appendChild(el);
+        requestAnimationFrame(() => {
+          el.classList.add('visible');
+          // Only scroll down if the card bottom would be clipped — don't yank
+          // the user's DOB bubble off the top of the screen.
+          const bottom = el.offsetTop + el.offsetHeight;
+          const target = bottom - chatScroll.clientHeight + 32;
+          if (target > chatScroll.scrollTop) chatScroll.scrollTop = target;
+        });
+        verifyCardEl = el;
+        resolve(el);
+      }, 500);
+    });
+  }
+
+  function updateVerifyCard() {
+    if (!verifyCardEl) return;
+    const toTitleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
+    const nameParts = state.name.trim().split(/\s+/);
+    const first = toTitleCase(nameParts[0] || '');
+    const last = toTitleCase(nameParts.slice(1).join(' ') || '');
+    const vals = { first, last, dob: state.dob };
+    verifyCardEl.querySelectorAll('.verify-card-value[data-key]').forEach(el => {
+      if (vals[el.dataset.key] !== undefined) el.textContent = vals[el.dataset.key];
+    });
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => { chatScroll.scrollTop = chatScroll.scrollHeight; }, 50);
+  }
+
+  function scrollToBubbleTop(el) {
+    chatScroll.scrollTop = el.offsetTop - 16;
+  }
+
+  // ── Card renderers ─────────────────────────────────────────────────────
+
+  function renderTextCard(step) {
+    activeCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card text-input-card';
+
+    const input = document.createElement('input');
+    input.type = step.inputType || 'text';
+    input.placeholder = step.placeholder || 'Type here';
+    if (step.inputType === 'tel') {
+      input.addEventListener('input', () => {
+        input.value = formatPhone(input.value);
+      });
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'send-btn';
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    input.addEventListener('input', () => {
+      const v = input.value.trim();
+      if (step.inputType === 'tel') {
+        btn.disabled = v.replace(/\D/g, '').length < 10;
+      } else if (step.inputType === 'email') {
+        btn.disabled = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      } else {
+        btn.disabled = v.length < 2;
+      }
+    });
+
+    btn.addEventListener('click', () => {
+      const val = input.value.trim();
+      if (!val) return;
+      advance(val);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !btn.disabled) btn.click();
+    });
+
+    card.appendChild(input);
+    card.appendChild(btn);
+    activeCard.appendChild(card);
+
+    requestAnimationFrame(() => input.focus());
+  }
+
+  function formatPhone(v) {
+    const digits = v.replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 3) return digits.length ? `(${digits}` : '';
+    if (digits.length <= 6) return `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  }
+
+  function renderPersistentInput(placeholder) {
+    activeCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card text-input-card';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || 'Type here';
+    input.readOnly = true;
+    input.style.color = '#7b818e';
+    const btn = document.createElement('button');
+    btn.className = 'send-btn';
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    card.appendChild(input);
+    card.appendChild(btn);
+    activeCard.appendChild(card);
+  }
+
+  function renderDateCard(step) {
+    renderPersistentInput('Date of birth');
+    overlayCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({length: 100}, (_, i) => currentYear - 117 + i);
+    const days = Array.from({length: 31}, (_, i) => i + 1);
+
+    const picker = document.createElement('div');
+    picker.className = 'date-picker';
+
+    const band = document.createElement('div');
+    band.className = 'selection-band';
+    picker.appendChild(band);
+
+    function makeDrum(items, colClass) {
+      const col = document.createElement('div');
+      col.className = `drum-col ${colClass}`;
+      items.forEach((item, i) => {
+        const el = document.createElement('div');
+        el.className = 'drum-item';
+        el.textContent = item;
+        el.dataset.index = i;
+        col.appendChild(el);
+      });
+
+      col.addEventListener('scroll', () => highlightSelected(col), { passive: true });
+
+      function highlightSelected(col) {
+        const scrollTop = col.scrollTop;
+        const itemH = 40;
+        const selected = Math.round(scrollTop / itemH);
+        col.querySelectorAll('.drum-item').forEach((el, i) => {
+          el.classList.toggle('selected', i === selected);
+        });
+      }
+
+      // Set initial position to middle-ish item
+      const initialIndex = colClass === 'year' ? 67 : colClass === 'month' ? new Date().getMonth() : 14;
+      setTimeout(() => {
+        col.scrollTop = initialIndex * 40;
+        highlightSelected(col);
+      }, 0);
+
+      return col;
+    }
+
+    const monthCol = makeDrum(months, 'month');
+    const dayCol = makeDrum(days, 'day');
+    const yearCol = makeDrum(years, 'year');
+
+    picker.appendChild(monthCol);
+    picker.appendChild(dayCol);
+    picker.appendChild(yearCol);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'Continue';
+
+    btn.addEventListener('click', () => {
+      const getSelected = (col, items) => {
+        const i = Math.round(col.scrollTop / 40);
+        return items[Math.min(i, items.length - 1)];
+      };
+      const m = getSelected(monthCol, months);
+      const d = getSelected(dayCol, days);
+      const y = getSelected(yearCol, years);
+      advance(`${m} ${d}, ${y}`);
+    });
+
+    card.appendChild(picker);
+    card.appendChild(btn);
+    overlayCard.appendChild(card);
+    requestAnimationFrame(() => {
+      overlayCard.style.marginTop = -activeCard.offsetHeight + 'px';
+    });
+  }
+
+  function renderOtpCard(step) {
+    // Replace the hidden input to wipe any accumulated event listeners from previous renders
+    const oldHidden = document.getElementById('otpHidden');
+    const freshHidden = oldHidden.cloneNode(false);
+    oldHidden.parentNode.replaceChild(freshHidden, oldHidden);
+
+    renderPersistentInput('');
+    overlayCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const dest = typeof step.subtitle === 'function' ? step.subtitle() : (step.subtitle || '');
+    const isPhone = step.otpType === 'phone';
+
+    const title = document.createElement('div');
+    title.className = 'otp-title';
+    title.textContent = 'Code sent to ' + dest;
+    card.appendChild(title);
+
+
+    const boxes = document.createElement('div');
+    boxes.className = 'otp-boxes';
+
+    const boxEls = [0,1,2,3].map(i => {
+      const box = document.createElement('div');
+      box.className = 'otp-box' + (i === 0 ? ' active' : '');
+      boxes.appendChild(box);
+      return box;
+    });
+    card.appendChild(boxes);
+
+    // Resend countdown
+    const resend = document.createElement('div');
+    resend.className = 'otp-resend';
+    let countdown = 30;
+    resend.textContent = `Resend code in 0:${String(countdown).padStart(2,'0')}`;
+    card.appendChild(resend);
+
+    const timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        resend.textContent = `Resend code in 0:${String(countdown).padStart(2,'0')}`;
+      } else {
+        clearInterval(timer);
+        resend.textContent = 'Resend code';
+        resend.classList.add('active');
+        resend.addEventListener('click', () => {
+          countdown = 30;
+          resend.textContent = `Resend code in 0:30`;
+          resend.classList.remove('active');
+          // restart timer
+          const t2 = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+              resend.textContent = `Resend code in 0:${String(countdown).padStart(2,'0')}`;
+            } else {
+              clearInterval(t2);
+              resend.textContent = 'Resend code';
+              resend.classList.add('active');
+            }
+          }, 1000);
+        }, { once: true });
+      }
+    }, 1000);
+
+    const hiddenInput = document.getElementById('otpHidden');
+    hiddenInput.value = '';
+
+    let submitted = false;
+
+    function updateBoxes() {
+      const val = hiddenInput.value;
+      boxEls.forEach((box, i) => {
+        box.textContent = val[i] || '';
+        box.classList.toggle('filled', !!val[i]);
+        box.classList.toggle('active', i === val.length && val.length < 4);
+      });
+      if (val.length >= 4 && !submitted) {
+        submitted = true;
+        clearInterval(timer);
+        setTimeout(() => {
+          const code = hiddenInput.value;
+          hiddenInput.value = '';
+          advance(code);
+        }, 300);
+      }
+    }
+
+    hiddenInput.addEventListener('input', updateBoxes);
+    hiddenInput.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
+    boxes.addEventListener('click', () => { hiddenInput.focus(); });
+
+    overlayCard.appendChild(card);
+    requestAnimationFrame(() => {
+      overlayCard.style.marginTop = -activeCard.offsetHeight + 'px';
+    });
+
+    hiddenInput.focus();
+    updateBoxes();
+  }
+
+  function renderTc1Card() {
+    activeCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = 'Electronic Communications Agreement';
+    card.appendChild(label);
+
+    let checked = false;
+
+    const row = document.createElement('div');
+    row.className = 'tc-row';
+    const cb = document.createElement('div');
+    cb.className = 'tc-checkbox';
+    const text = document.createElement('div');
+    text.className = 'tc-text';
+    text.innerHTML = 'I agree to the <a href="#">Electronic Communications Agreement</a> and to receive transactional SMS.';
+    cb.addEventListener('click', () => {
+      checked = !checked;
+      cb.classList.toggle('checked', checked);
+      btn.disabled = !checked;
+    });
+    row.appendChild(cb);
+    row.appendChild(text);
+    card.appendChild(row);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'Continue';
+    btn.disabled = true;
+
+    btn.addEventListener('click', () => {
+      if (!checked) return;
+      advance('I agree to the Electronic Communications Agreement');
+    });
+
+    card.appendChild(btn);
+    activeCard.appendChild(card);
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+      document.activeElement.blur();
+    }
+  }
+
+  function renderTcCard() {
+    activeCard.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = 'Terms and conditions';
+    card.appendChild(label);
+
+    let checked1 = false;
+    let checked2 = false;
+
+    // Required checkbox
+    const row1 = document.createElement('div');
+    row1.className = 'tc-row';
+    const cb1 = document.createElement('div');
+    cb1.className = 'tc-checkbox';
+    const text1 = document.createElement('div');
+    text1.className = 'tc-text';
+    text1.innerHTML = 'I agree to the <a href="#">General Terms of Service</a> and acknowledge have read <a href="#">EarnIn\'s Privacy Documents</a>';
+    cb1.addEventListener('click', () => {
+      checked1 = !checked1;
+      cb1.classList.toggle('checked', checked1);
+      btn.disabled = !checked1;
+    });
+    row1.appendChild(cb1);
+    row1.appendChild(text1);
+    card.appendChild(row1);
+
+    // Optional checkbox
+    const row2 = document.createElement('div');
+    row2.className = 'tc-row';
+    const cb2 = document.createElement('div');
+    cb2.className = 'tc-checkbox';
+    const text2 = document.createElement('div');
+    text2.className = 'tc-text';
+    text2.textContent = 'Text me automated messages with tips, updates, and offers that help me stay one step ahead with my money. Msg & data rates may apply and msg frequency varies. Participation optional. Reply STOP to opt out or HELP for help.';
+    cb2.addEventListener('click', () => {
+      checked2 = !checked2;
+      cb2.classList.toggle('checked', checked2);
+    });
+    row2.appendChild(cb2);
+    row2.appendChild(text2);
+    card.appendChild(row2);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'Continue';
+    btn.disabled = true;
+
+    btn.addEventListener('click', () => {
+      if (!checked1) return;
+      let msg = 'I agree to the General Terms of Service and EarnIn\'s Privacy Documents';
+      if (checked2) msg += ', and to receive automated text messages';
+      advance(msg);
+    });
+
+    card.appendChild(btn);
+    activeCard.appendChild(card);
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+      document.activeElement.blur();
+    }
+  }
+
+  function _buildQuickContainer(step, onSelect) {
+    const container = document.createElement('div');
+    container.className = 'quick-replies';
+    container.style.padding = '0 0 24px';
+
+    step.options.forEach((opt, idx) => {
+      const label = typeof opt === 'string' ? opt : opt.label;
+      const primary = typeof opt === 'object' && opt.primary;
+      const btn = document.createElement('button');
+      btn.className = 'quick-reply-btn' + (primary ? ' quick-reply-btn--primary' : '');
+      btn.textContent = label;
+      // Start hidden for stagger-in animation
+      btn.style.opacity = '0';
+      btn.style.transform = 'translateY(6px)';
+      btn.style.transition = `opacity 0.18s ease ${idx * 55}ms, transform 0.18s ease ${idx * 55}ms`;
+      btn.addEventListener('click', () => onSelect(label, container));
+      container.appendChild(btn);
+    });
+    return container;
+  }
+
+  function _animateInQuickContainer(container) {
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.quick-reply-btn').forEach(btn => {
+        btn.style.opacity = '1';
+        btn.style.transform = 'translateY(0)';
+      });
+    });
+    // Re-enable the persistent input — advance() disables it during the typing pause
+    const persistInput = activeCard.querySelector('.text-input-card input');
+    if (persistInput) {
+      persistInput.disabled = false;
+      persistInput.placeholder = 'Or type something else...';
+    }
+  }
+
+  function renderQuickReplies(step) {
+    // Remove old quick replies but keep the persistent text input
+    activeCard.querySelector('.quick-replies')?.remove();
+
+    const container = _buildQuickContainer(step, (label, cont) => {
+      if (step.requestPermission) {
+        cont.querySelectorAll('button').forEach(b => b.disabled = true);
+        const doAdvance = () => advance(label);
+        if (window.webkit?.messageHandlers?.requestPushPermission) {
+          window.webkit.messageHandlers.requestPushPermission.postMessage(null);
+          doAdvance();
+        } else if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+          Notification.requestPermission().then(doAdvance).catch(doAdvance);
+        } else {
+          doAdvance();
+        }
+      } else {
+        advance(label);
+      }
+    });
+
+    // Insert before text input if it already exists, otherwise append + create input
+    const existingInput = activeCard.querySelector('.text-input-card');
+    if (existingInput) {
+      activeCard.insertBefore(container, existingInput);
+    } else {
+      activeCard.appendChild(container);
+      appendPersistentInput('Or type something else...');
+    }
+    _animateInQuickContainer(container);
+  }
+
+  function renderIntroCard(step) {
+    // Remove old quick replies but keep the persistent text input
+    activeCard.querySelector('.quick-replies')?.remove();
+
+    const container = _buildQuickContainer(step, (label) => advance(label));
+
+    const existingInput = activeCard.querySelector('.text-input-card');
+    if (existingInput) {
+      activeCard.insertBefore(container, existingInput);
+    } else {
+      activeCard.appendChild(container);
+      appendPersistentInput('Or type something else...');
+    }
+    _animateInQuickContainer(container);
+  }
+
+  function appendPersistentInput(placeholder) {
+    const card = document.createElement('div');
+    card.className = 'card text-input-card';
+    card.style.marginTop = '0';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || 'Type here';
+
+    const btn = document.createElement('button');
+    btn.className = 'send-btn';
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    input.addEventListener('input', () => {
+      btn.disabled = input.value.trim().length < 1;
+    });
+    const submit = () => { if (input.value.trim()) advance(input.value.trim()); };
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) submit(); });
+
+    card.appendChild(input);
+    card.appendChild(btn);
+    activeCard.appendChild(card);
+  }
+
+  function renderAttributionCard() {
+    _buildAttributionList(false);
+  }
+
+  function _buildAttributionList(isSocialDrill) {
+    activeCard.innerHTML = '';
+
+    const SOURCES = isSocialDrill
+      ? ['Facebook / Instagram', 'TikTok', 'Reddit', 'Snapchat']
+      : ['Family or friends', 'Social media', 'YouTube', 'Radio',
+         'Podcast', 'TV', 'App store or Google', 'Other app/service', 'My employer'];
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'padding:0;gap:0;overflow:hidden;';
+
+    // Header: back (drill only) + skip
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px;';
+
+    if (isSocialDrill) {
+      const backBtn = document.createElement('button');
+      backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 14L6 9l5-5" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      backBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:#000;opacity:0.6;';
+      backBtn.addEventListener('click', () => _buildAttributionList(false));
+      header.appendChild(backBtn);
+    } else {
+      header.appendChild(document.createElement('span')); // spacer
+    }
+
+    const skipBtn = document.createElement('button');
+    skipBtn.textContent = 'Skip';
+    skipBtn.style.cssText = 'background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);cursor:pointer;padding:4px 0;';
+    skipBtn.addEventListener('click', () => { activeCard.innerHTML = ''; advance('Skip'); });
+    header.appendChild(skipBtn);
+    card.appendChild(header);
+
+    // List
+    const list = document.createElement('div');
+    list.style.cssText = 'max-height:240px;overflow-y:auto;border-top:1px solid #f0f0f0;';
+
+    SOURCES.forEach(label => {
+      const row = document.createElement('button');
+      row.textContent = label;
+      row.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid #f0f0f0;padding:14px 16px;font-family:inherit;font-size:16px;color:#111;cursor:pointer;';
+      row.addEventListener('click', () => {
+        if (!isSocialDrill && label === 'Social media') {
+          _buildAttributionList(true);
+        } else {
+          activeCard.innerHTML = '';
+          advance(label);
+        }
+      });
+      list.appendChild(row);
+    });
+    // Other free-text input row — part of the scroll list
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid #f0f0f0;';
+    const otherInput = document.createElement('input');
+    otherInput.type = 'text';
+    otherInput.placeholder = 'Other';
+    otherInput.style.cssText = 'flex:1;border:none;outline:none;font-family:inherit;font-size:16px;background:transparent;';
+    const otherBtn = document.createElement('button');
+    otherBtn.className = 'send-btn';
+    otherBtn.disabled = true;
+    otherBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    otherInput.addEventListener('input', () => { otherBtn.disabled = otherInput.value.trim().length < 1; });
+    const submitOther = () => {
+      const v = otherInput.value.trim();
+      if (!v) return;
+      activeCard.innerHTML = '';
+      advance(v);
+    };
+    otherBtn.addEventListener('click', submitOther);
+    otherInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !otherBtn.disabled) submitOther(); });
+    inputRow.appendChild(otherInput);
+    inputRow.appendChild(otherBtn);
+    list.appendChild(inputRow);
+
+    card.appendChild(list);
+
+    activeCard.appendChild(card);
+  }
+
+  function dobToMMDDYYYY(dob) {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const m = dob.match(/^(\w+)\s+(\d+),?\s+(\d{4})$/);
+    if (m) {
+      const idx = months.findIndex(mo => mo.toLowerCase().startsWith(m[1].toLowerCase()));
+      if (idx >= 0) return `${String(idx+1).padStart(2,'0')}/${String(m[2]).padStart(2,'0')}/${m[3]}`;
+    }
+    return dob;
+  }
+
+  function renderVerifyConfirmCard(editMode = false) {
+    activeCard.innerHTML = '';
+    const toTitleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
+    const nameParts = state.name.trim().split(/\s+/);
+    const first = toTitleCase(nameParts[0] || '');
+    const last  = toTitleCase(nameParts.slice(1).join(' ') || '');
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'padding:12px 16px 8px;';
+
+    const card = document.createElement('div');
+    card.className = 'verify-edit-card';
+
+    const fieldDefs = [
+      { label: 'First name',    value: first,                    key: 'first', inputMode: 'text',    ph: 'First name'  },
+      { label: 'Last name',     value: last,                     key: 'last',  inputMode: 'text',    ph: 'Last name'   },
+      { label: 'Date of birth', value: editMode ? dobToMMDDYYYY(state.dob) : state.dob, key: 'dob', inputMode: 'numeric', ph: 'MM/DD/YYYY' },
+    ];
+
+    const inputs = {};
+
+    fieldDefs.forEach((f, i) => {
+      if (i > 0) { const d = document.createElement('div'); d.style.cssText='height:1px;background:#f0f0f0;'; card.appendChild(d); }
+      const row = document.createElement('div');
+      row.className = 'verify-edit-row';
+      const lbl = document.createElement('div');
+      lbl.className = 'verify-card-label';
+      lbl.textContent = f.label;
+      row.appendChild(lbl);
+      if (editMode) {
+        const inp = document.createElement('input');
+        inp.className = 'verify-edit-input';
+        inp.type = 'text';
+        inp.inputMode = f.inputMode;
+        inp.value = f.value;
+        inp.placeholder = f.ph;
+        if (f.key === 'dob') {
+          inp.maxLength = 10;
+          inp.addEventListener('input', () => {
+            let v = inp.value.replace(/\D/g,'').slice(0,8);
+            inp.value = v.length>4 ? v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4) : v.length>2 ? v.slice(0,2)+'/'+v.slice(2) : v;
+          });
+        }
+        inputs[f.key] = inp;
+        row.appendChild(inp);
+      } else {
+        const val = document.createElement('div');
+        val.className = 'verify-card-value';
+        val.textContent = f.value;
+        row.appendChild(val);
+      }
+      card.appendChild(row);
+    });
+
+    // Divider above actions
+    const actDivider = document.createElement('div');
+    actDivider.style.cssText = 'height:1px;background:#f0f0f0;';
+    card.appendChild(actDivider);
+
+    const actRow = document.createElement('div');
+    actRow.style.cssText = 'padding:14px 16px;display:flex;flex-direction:column;gap:10px;';
+
+    if (editMode) {
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'success-cta';
+      saveBtn.textContent = 'Save';
+      saveBtn.addEventListener('click', () => {
+        const f = inputs.first.value.trim();
+        const l = inputs.last.value.trim();
+        const d = inputs.dob.value.trim();
+        if (!f || !l) return;
+        state.name = f + ' ' + l;
+        if (d) state.dob = d;
+        updateVerifyCard();
+        renderCard(flow[state.step]);
+      });
+      actRow.appendChild(saveBtn);
+      setTimeout(() => inputs.first?.focus(), 80);
+    } else {
+      const verifyBtn = document.createElement('button');
+      verifyBtn.className = 'success-cta';
+      verifyBtn.textContent = 'Verify';
+      verifyBtn.addEventListener('click', () => advance('Verify'));
+
+      const changeBtn = document.createElement('button');
+      changeBtn.textContent = 'Make changes';
+      changeBtn.style.cssText = 'background:none;border:none;font-family:inherit;font-size:15px;font-weight:600;color:rgba(0,0,0,0.45);cursor:pointer;padding:4px 0;text-align:center;';
+      changeBtn.addEventListener('click', () => renderVerifyConfirmCard(true));
+
+      actRow.appendChild(verifyBtn);
+      actRow.appendChild(changeBtn);
+    }
+
+    card.appendChild(actRow);
+    wrap.appendChild(card);
+    activeCard.appendChild(wrap);
+  }
+
+  function renderContinueCard() {
+    activeCard.innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'success-cta';
+    btn.textContent = 'Continue set up';
+    btn.style.cssText = 'opacity:0;transform:translateY(4px);transition:opacity 0.2s,transform 0.2s;cursor:default;';
+    btn.disabled = true;
+    activeCard.appendChild(btn);
+    requestAnimationFrame(() => { btn.style.opacity = '1'; btn.style.transform = 'translateY(0)'; });
+  }
+
+  // ── Step advance ───────────────────────────────────────────────────────
+  const proxyInput = document.getElementById('proxyInput');
+
+  function advance(userInput) {
+    const current = flow[state.step];
+
+    // Dismiss keyboard
+    if (document.activeElement) document.activeElement.blur();
+
+    // Clear overlay if present (DOB/OTP cards)
+    overlayCard.innerHTML = '';
+    overlayCard.style.marginTop = '0';
+
+    if (userInput !== null && userInput !== undefined) {
+      current.onSubmit(userInput);
+      addUserMsg(userInput);
+      if (current.postSubmit) current.postSubmit();
+      requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
+    }
+
+    const optionResponse = current.optionResponses && userInput && current.optionResponses[userInput];
+
+    state.step++;
+    if (state.step >= flow.length) return;
+
+    const next = flow[state.step];
+
+    // Keep input visible and update placeholder; for non-input cards clear entirely
+    const isInputStep = current.card === 'text' || current.card === 'date' || current.card === 'otp' || current.card === 'quick' || current.card === 'intro';
+    if (isInputStep) {
+      activeCard.querySelector('.quick-replies')?.remove();
+      const currentInput = activeCard.querySelector('.text-input-card input');
+      if (currentInput) {
+        currentInput.value = '';
+        currentInput.placeholder = 'Type here';
+        currentInput.disabled = true;
+        const sendBtn = activeCard.querySelector('.send-btn');
+        if (sendBtn) sendBtn.disabled = true;
+      }
+    } else {
+      activeCard.innerHTML = '';
+    }
+
+    // Focus proxy during user gesture for text + OTP so iOS brings keyboard up
+    if (next.card === 'text' || next.card === 'otp') {
+      proxyInput.type = next.card === 'otp' ? 'tel' : (next.inputType || 'text');
+      proxyInput.focus();
+    }
+    const msg = typeof next.botMsg === 'function' ? next.botMsg() : next.botMsg;
+
+    const bubbleToScrollTo = lastUserBubble;
+    const opensKeyboard = next.card === 'text' || next.card === 'otp';
+    if (opensKeyboard) {
+      // Re-apply scroll after keyboard animation (~250ms) in case it was cancelled
+      setTimeout(() => scrollToBubbleTop(bubbleToScrollTo), 350);
+    }
+    const gen = generation;
+    setTimeout(async () => {
+      if (generation !== gen) return;
+      if (optionResponse) await addBotMsg(optionResponse);
+      if (generation !== gen) return;
+      if (next.gifMsg) await addGifBubble(next.gifMsg);
+      if (generation !== gen) return;
+      // Capture scroll anchor BEFORE rendering — keeps the user's last bubble
+      // pinned at the top of the screen once all messages are done typing.
+      const scrollAnchor = next.pinScrollToLastUser ? lastUserBubble : null;
+      if (next.preBotMsg) await addBotMsg(typeof next.preBotMsg === 'function' ? next.preBotMsg() : next.preBotMsg);
+      if (generation !== gen) return;
+      if (msg) {
+        const botEl = await addBotMsg(msg, next.botMsgStyle, next.botMsgBody);
+        if (next.saveBotBubble) next.saveBotBubble(botEl);
+        if (generation !== gen) return;
+      }
+      if (next.verifyCard) await addVerifyCardBubble();
+      if (generation !== gen) return;
+      // Re-anchor: snap DOB bubble back to top after all verify content renders.
+      if (scrollAnchor) scrollToBubbleTop(scrollAnchor);
+      setTimeout(() => {
+        renderCard(next);
+        // Re-check after the card renders — a taller card area shrinks the
+        // chat viewport and may push the last bot message out of view.
+        requestAnimationFrame(() => updateScrollHint?.());
+      }, 150);
+    }, 400);
+  }
+
+  function renderCard(step) {
+    switch (step.card) {
+      case 'intro':  renderIntroCard(step); break;
+      case 'text':   renderTextCard(step); break;
+      case 'date':   renderDateCard(step); break;
+      case 'otp':    renderOtpCard(step);  break;
+      case 'tc1':    renderTc1Card();      break;
+      case 'tc':     renderTcCard();       break;
+      case 'quick':  renderQuickReplies(step); break;
+      case 'verify-confirm': renderVerifyConfirmCard(); break;
+      case 'attribution': renderAttributionCard(); break;
+      case 'continue':   renderContinueCard();    break;
+    }
+  }
+
+  // ── Disclosures sheet ─────────────────────────────────────────────────
+  const sheetBackdrop = document.getElementById('sheetBackdrop');
+  const disclosuresSheet = document.getElementById('disclosuresSheet');
+
+  function openDisclosures() {
+    sheetBackdrop.classList.add('visible');
+    disclosuresSheet.classList.add('visible');
+  }
+  function closeDisclosures() {
+    sheetBackdrop.classList.remove('visible');
+    disclosuresSheet.classList.remove('visible');
+  }
+
+  document.getElementById('sheetClose').addEventListener('click', closeDisclosures);
+  sheetBackdrop.addEventListener('click', closeDisclosures);
+
+  chatScroll.addEventListener('click', e => {
+    const link = e.target.closest('a');
+    if (link && link.getAttribute('href') === '#disclosures') {
+      e.preventDefault();
+      openDisclosures();
+    }
+  });
+
+  // ── Name edit sheet ───────────────────────────────────────────────────
+  const nameEditBackdrop = document.getElementById('nameEditBackdrop');
+  const nameEditSheet = document.getElementById('nameEditSheet');
+  const nameEditInput = document.getElementById('nameEditInput');
+  const nameEditContinue = document.getElementById('nameEditContinue');
+  const nameEditClose = document.getElementById('nameEditClose');
+
+  function openNameEdit() {
+    activeCard.style.display = 'none';
+    overlayCard.style.display = 'none';
+    nameEditInput.value = state.name;
+    nameEditContinue.disabled = true;
+    nameEditBackdrop.classList.add('visible');
+    nameEditSheet.classList.add('visible');
+    setTimeout(() => nameEditInput.focus(), 300);
+  }
+  function closeNameEdit(restoreCards = true) {
+    nameEditBackdrop.classList.remove('visible');
+    nameEditSheet.classList.remove('visible');
+    nameEditInput.blur();
+    if (restoreCards) {
+      activeCard.style.display = '';
+      // Wait for sheet slide-down to finish before revealing the card
+      setTimeout(() => { overlayCard.style.display = ''; }, 360);
+    }
+  }
+
+  nameEditClose.addEventListener('click', () => closeNameEdit(true));
+  nameEditBackdrop.addEventListener('click', () => closeNameEdit(true));
+
+  nameEditInput.addEventListener('input', () => {
+    const v = nameEditInput.value.trim();
+    nameEditContinue.disabled = !v || v === state.name;
+  });
+
+  nameEditContinue.addEventListener('click', () => {
+    const newName = nameEditInput.value.trim();
+    if (!newName) return;
+    state.name = newName;
+    if (nameBubbleEl) nameBubbleEl.textContent = newName;
+    niceMeetYouBubble?.remove();
+    niceMeetYouBubble = null;
+    closeNameEdit(true);
+    const nameEditGen = generation;
+
+    if (state.editingFromVerify) {
+      state.editingFromVerify = false;
+      updateVerifyCard();
+      const verifyIdx = flow.findIndex(s => s.verifyCard);
+      state.step = verifyIdx;
+      setTimeout(async () => {
+        if (generation !== nameEditGen) return;
+        await addBotMsg(`Got it! Does this still look right?`);
+        if (generation !== nameEditGen) return;
+        setTimeout(() => { activeCard.innerHTML = ''; renderCard(flow[verifyIdx]); requestAnimationFrame(() => updateScrollHint?.()); }, 150);
+      }, 380);
+      return;
+    }
+
+    setTimeout(async () => {
+      if (generation !== nameEditGen) return;
+      const nameRow = nameBubbleEl?.closest('.bubble-user-row') || nameBubbleEl;
+      if (nameRow) scrollToBubbleTop(nameRow);
+      const el = await addBotMsg(`Hi ${newName.split(' ')[0]}! Let's keep going.\n\nNext up — your date of birth. I use this to confirm you meet the age requirement to use EarnIn.`);
+      if (generation === nameEditGen) niceMeetYouBubble = el;
+    }, 380);
+  });
+
+  // ── Phone edit sheet ──────────────────────────────────────────────────
+  const phoneEditBackdrop = document.getElementById('phoneEditBackdrop');
+  const phoneEditSheet    = document.getElementById('phoneEditSheet');
+  const phoneEditInput    = document.getElementById('phoneEditInput');
+  const phoneEditSave     = document.getElementById('phoneEditSave');
+  const phoneEditClose    = document.getElementById('phoneEditClose');
+
+  function openPhoneEdit() {
+    activeCard.style.display = 'none';
+    overlayCard.style.display = 'none';
+    phoneEditInput.value = state.phone;
+    phoneEditSave.disabled = true;
+    phoneEditBackdrop.classList.add('visible');
+    phoneEditSheet.classList.add('visible');
+    setTimeout(() => phoneEditInput.focus(), 300);
+  }
+  function closePhoneEdit(restoreCards = true) {
+    phoneEditBackdrop.classList.remove('visible');
+    phoneEditSheet.classList.remove('visible');
+    phoneEditInput.blur();
+    if (restoreCards) {
+      activeCard.style.display = '';
+      setTimeout(() => { overlayCard.style.display = ''; }, 360);
+    }
+  }
+
+  phoneEditClose.addEventListener('click', () => closePhoneEdit(true));
+  phoneEditBackdrop.addEventListener('click', () => closePhoneEdit(true));
+
+  phoneEditInput.addEventListener('input', () => {
+    phoneEditInput.value = formatPhone(phoneEditInput.value);
+    const v = phoneEditInput.value.trim();
+    phoneEditSave.disabled = v.length < 2 || v === state.phone;
+  });
+
+  phoneEditSave.addEventListener('click', () => {
+    const newPhone = phoneEditInput.value.trim();
+    if (!newPhone) return;
+    state.phone = newPhone;
+    state.email = '';
+    if (phoneBubbleEl) phoneBubbleEl.textContent = newPhone;
+    // Remove all chat content after the phone bubble
+    const phoneRow = phoneBubbleEl?.closest('.bubble-user-row') || phoneBubbleEl;
+    if (phoneRow) {
+      let sibling = phoneRow.nextSibling;
+      while (sibling) {
+        const next = sibling.nextSibling;
+        sibling.remove();
+        sibling = next;
+      }
+    }
+    otpPhoneBotBubble = null;
+    const phoneOtpIndex = flow.findIndex(s => s.otpType === 'phone');
+    if (phoneOtpIndex >= 0) state.step = phoneOtpIndex;
+    closePhoneEdit(false);
+    const phoneEditGen = generation;
+    setTimeout(async () => {
+      if (generation !== phoneEditGen) return;
+      activeCard.style.display = '';
+      overlayCard.innerHTML = '';
+      overlayCard.style.display = '';
+      overlayCard.style.marginTop = '0';
+      if (phoneRow) scrollToBubbleTop(phoneRow);
+      const el = await addBotMsg("I just texted you a 4-digit code. Enter it below to confirm your number.");
+      if (generation !== phoneEditGen) return;
+      otpPhoneBotBubble = el;
+      setTimeout(() => { if (generation === phoneEditGen) { renderCard(flow[state.step]); requestAnimationFrame(() => updateScrollHint?.()); } }, 150);
+    }, 380);
+  });
+
+  // ── Email edit sheet ──────────────────────────────────────────────────
+  const emailEditBackdrop = document.getElementById('emailEditBackdrop');
+  const emailEditSheet    = document.getElementById('emailEditSheet');
+  const emailEditInput    = document.getElementById('emailEditInput');
+  const emailEditSave     = document.getElementById('emailEditSave');
+  const emailEditClose    = document.getElementById('emailEditClose');
+
+  function openEmailEdit() {
+    activeCard.style.display = 'none';
+    overlayCard.style.display = 'none';
+    emailEditInput.value = state.email;
+    emailEditSave.disabled = true;
+    emailEditBackdrop.classList.add('visible');
+    emailEditSheet.classList.add('visible');
+    setTimeout(() => emailEditInput.focus(), 300);
+  }
+  function closeEmailEdit(restoreCards = true) {
+    emailEditBackdrop.classList.remove('visible');
+    emailEditSheet.classList.remove('visible');
+    emailEditInput.blur();
+    if (restoreCards) {
+      activeCard.style.display = '';
+      setTimeout(() => { overlayCard.style.display = ''; }, 360);
+    }
+  }
+
+  emailEditClose.addEventListener('click', () => closeEmailEdit(true));
+  emailEditBackdrop.addEventListener('click', () => closeEmailEdit(true));
+
+  emailEditInput.addEventListener('input', () => {
+    const v = emailEditInput.value.trim();
+    emailEditSave.disabled = v.length < 3 || v === state.email;
+  });
+
+  emailEditSave.addEventListener('click', () => {
+    const newEmail = emailEditInput.value.trim();
+    if (!newEmail) return;
+    state.email = newEmail;
+    if (emailBubbleEl) emailBubbleEl.textContent = newEmail;
+    // Remove all chat content after the email bubble
+    const emailRow = emailBubbleEl?.closest('.bubble-user-row') || emailBubbleEl;
+    if (emailRow) {
+      let sibling = emailRow.nextSibling;
+      while (sibling) {
+        const next = sibling.nextSibling;
+        sibling.remove();
+        sibling = next;
+      }
+    }
+    otpEmailBotBubble = null;
+    const emailOtpIndex = flow.findIndex(s => s.otpType === 'email');
+    if (emailOtpIndex >= 0) state.step = emailOtpIndex;
+    closeEmailEdit(false);
+    const emailEditGen = generation;
+    setTimeout(async () => {
+      if (generation !== emailEditGen) return;
+      activeCard.style.display = '';
+      overlayCard.innerHTML = '';
+      overlayCard.style.display = '';
+      overlayCard.style.marginTop = '0';
+      if (emailRow) scrollToBubbleTop(emailRow);
+      const el = await addBotMsg("Got it! Check your inbox for the verification code I sent you. If you don't see it, look in your spam or junk folder.");
+      if (generation !== emailEditGen) return;
+      otpEmailBotBubble = el;
+      setTimeout(() => { if (generation === emailEditGen) { renderCard(flow[state.step]); requestAnimationFrame(() => updateScrollHint?.()); } }, 150);
+    }, 380);
+  });
+
+  // ── DOB edit sheet ────────────────────────────────────────────────────
+  const dobEditBackdrop = document.getElementById('dobEditBackdrop');
+  const dobEditSheet = document.getElementById('dobEditSheet');
+  const dobEditPickerArea = document.getElementById('dobEditPickerArea');
+  const dobEditClose = document.getElementById('dobEditClose');
+
+  function openDobEdit() {
+    activeCard.style.display = 'none';
+    overlayCard.style.display = 'none';
+
+    // Build picker pre-positioned to current state.dob
+    dobEditPickerArea.innerHTML = '';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({length: 100}, (_, i) => currentYear - 117 + i);
+    const days = Array.from({length: 31}, (_, i) => i + 1);
+
+    let initMonth = new Date().getMonth();
+    let initDay = 14;
+    let initYear = 67;
+    if (state.dob) {
+      const parts = state.dob.match(/^(\w+)\s+(\d+),\s+(\d+)$/);
+      if (parts) {
+        const mi = months.indexOf(parts[1]);
+        if (mi >= 0) initMonth = mi;
+        initDay = parseInt(parts[2]) - 1;
+        const yi = years.indexOf(parseInt(parts[3]));
+        if (yi >= 0) initYear = yi;
+      }
+    }
+
+    const picker = document.createElement('div');
+    picker.className = 'date-picker';
+    const band = document.createElement('div');
+    band.className = 'selection-band';
+    picker.appendChild(band);
+
+    function makeDrum(items, colClass, initIndex) {
+      const col = document.createElement('div');
+      col.className = `drum-col ${colClass}`;
+      items.forEach((item, i) => {
+        const el = document.createElement('div');
+        el.className = 'drum-item';
+        el.textContent = item;
+        el.dataset.index = i;
+        col.appendChild(el);
+      });
+      col.addEventListener('scroll', () => {
+        const selected = Math.round(col.scrollTop / 40);
+        col.querySelectorAll('.drum-item').forEach((el, i) => el.classList.toggle('selected', i === selected));
+      }, { passive: true });
+      setTimeout(() => {
+        col.scrollTop = initIndex * 40;
+        const selected = Math.round(col.scrollTop / 40);
+        col.querySelectorAll('.drum-item').forEach((el, i) => el.classList.toggle('selected', i === selected));
+      }, 0);
+      return col;
+    }
+
+    const monthCol = makeDrum(months, 'month', initMonth);
+    const dayCol   = makeDrum(days,   'day',   initDay);
+    const yearCol  = makeDrum(years,  'year',  initYear);
+    picker.appendChild(monthCol);
+    picker.appendChild(dayCol);
+    picker.appendChild(yearCol);
+
+    const getSelected = (col, items) => items[Math.min(Math.round(col.scrollTop / 40), items.length - 1)];
+    const checkDobChanged = () => {
+      const m = getSelected(monthCol, months);
+      const d = getSelected(dayCol, days);
+      const y = getSelected(yearCol, years);
+      saveBtn.disabled = `${m} ${d}, ${y}` === state.dob;
+    };
+    [monthCol, dayCol, yearCol].forEach(col => col.addEventListener('scroll', checkDobChanged, { passive: true }));
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'name-sheet-cta';
+    saveBtn.style.marginTop = '16px';
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = true;
+    saveBtn.addEventListener('click', () => {
+      const m = getSelected(monthCol, months);
+      const d = getSelected(dayCol, days);
+      const y = getSelected(yearCol, years);
+      const newDob = `${m} ${d}, ${y}`;
+      state.dob = newDob;
+      if (dobBubbleEl) dobBubbleEl.textContent = newDob;
+      phoneBotBubble?.remove();
+      phoneBotBubble = null;
+      closeDobEdit(true);
+      const dobEditGen = generation;
+
+      if (state.editingFromVerify) {
+        state.editingFromVerify = false;
+        updateVerifyCard();
+        const verifyIdx = flow.findIndex(s => s.verifyCard);
+        state.step = verifyIdx;
+        setTimeout(async () => {
+          if (generation !== dobEditGen) return;
+          await addBotMsg(`Got it! Does this still look right?`);
+          if (generation !== dobEditGen) return;
+          setTimeout(() => { activeCard.innerHTML = ''; renderCard(flow[verifyIdx]); requestAnimationFrame(() => updateScrollHint?.()); }, 150);
+        }, 380);
+        return;
+      }
+
+      setTimeout(async () => {
+        if (generation !== dobEditGen) return;
+        const dobRow = dobBubbleEl?.closest('.bubble-user-row') || dobBubbleEl;
+        if (dobRow) scrollToBubbleTop(dobRow);
+        const el = await addBotMsg(`Perfect! What's your phone number? I'll text you a verification code.`);
+        if (generation === dobEditGen) phoneBotBubble = el;
+      }, 380);
+    });
+
+    dobEditPickerArea.appendChild(picker);
+    dobEditPickerArea.appendChild(saveBtn);
+
+    dobEditBackdrop.classList.add('visible');
+    dobEditSheet.classList.add('visible');
+  }
+
+  function closeDobEdit(restoreCards = true) {
+    dobEditBackdrop.classList.remove('visible');
+    dobEditSheet.classList.remove('visible');
+    if (restoreCards) {
+      activeCard.style.display = '';
+      setTimeout(() => { overlayCard.style.display = ''; }, 360);
+    }
+  }
+
+  dobEditClose.addEventListener('click', () => closeDobEdit(true));
+  dobEditBackdrop.addEventListener('click', () => closeDobEdit(true));
+
+  // ── Boot ───────────────────────────────────────────────────────────────
+  async function boot() {
+    const gen = generation;
+    const first = flow[0];
+    // Show the text input immediately — quick replies animate in after typing
+    appendPersistentInput('Or type something else...');
+    const msg = typeof first.botMsg === 'function' ? first.botMsg() : first.botMsg;
+    await addBotMsg(msg, first.botMsgStyle, first.botMsgBody);
+    if (generation !== gen) return;
+    setTimeout(() => { if (generation === gen) { renderCard(first); requestAnimationFrame(() => updateScrollHint?.()); } }, 150);
+  }
+
+  function restart() {
+    generation++;
+    state.step = 0;
+    state.name = '';
+    state.dob = '';
+    state.phone = '';
+    state.email = '';
+    lastUserBubble = null;
+    nameBubbleEl = null;
+    niceMeetYouBubble = null;
+    dobBubbleEl = null;
+    verifyCardEl = null;
+    phoneBotBubble = null;
+    state.editingFromVerify = false;
+    phoneBubbleEl = null;
+    otpPhoneBotBubble = null;
+    emailBubbleEl = null;
+    emailBotBubble = null;
+    otpEmailBotBubble = null;
+    document.getElementById('successOverlay')?.remove();
+    chatScroll.innerHTML = '';
+    activeCard.innerHTML = '';
+    overlayCard.innerHTML = '';
+    overlayCard.style.marginTop = '0';
+    chatScroll.scrollTop = 0;
+    proxyInput.blur();
+    boot();
+  }
+
+  boot();
+
+  document.getElementById('restartBtn').addEventListener('click', restart);
+
+  const cardArea = document.getElementById('cardArea');
+
+  // ── Scroll hint button ─────────────────────────────────────────────────
+  const scrollHintBtn = document.getElementById('scrollHintBtn');
+
+  function getLastBotBubble() {
+    const all = chatScroll.querySelectorAll('.bubble-bot, .bubble-bot-hero');
+    return all.length ? all[all.length - 1] : null;
+  }
+
+  function updateScrollHint() {
+    const lastBotBubble = getLastBotBubble();
+    if (!lastBotBubble) { scrollHintBtn.classList.remove('visible'); return; }
+    const bubbleBottom = lastBotBubble.getBoundingClientRect().bottom;
+    const chatBottom = chatScroll.getBoundingClientRect().bottom;
+    scrollHintBtn.classList.toggle('visible', bubbleBottom > chatBottom + 8);
+  }
+
+  chatScroll.addEventListener('scroll', updateScrollHint, { passive: true });
+
+  scrollHintBtn.addEventListener('click', () => {
+    const lastBotBubble = getLastBotBubble();
+    if (!lastBotBubble) return;
+    const targetTop = lastBotBubble.offsetTop - 16;
+    const targetScroll = Math.max(targetTop, chatScroll.scrollTop);
+    // Scroll so the bottom of the bubble is just above the card area
+    const bubbleBottom = lastBotBubble.offsetTop + lastBotBubble.offsetHeight;
+    const visibleHeight = chatScroll.clientHeight;
+    chatScroll.scrollTo({ top: bubbleBottom - visibleHeight + 24, behavior: 'smooth' });
+  });
+
+  // ── Prevent WKWebView native scrollView from scrolling when inputs are focused ──
+  window.addEventListener('scroll', () => {
+    window.scrollTo(0, 0);
+  }, { passive: true });
+
+  // ── Dismiss keyboard on chat tap ──
+  document.addEventListener('touchstart', (e) => {
+    if (chatScroll.contains(e.target)) {
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        document.activeElement.blur();
+      }
+    }
+  });
+</script>
+</body>
+</html>

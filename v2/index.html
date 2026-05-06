@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Conversational Onboarding – v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; overflow: hidden; background: #FBEA6B; }
+    body { font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    .phone {
+      position: fixed; inset: 0;
+      background: #FBEA6B;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Nav ── */
+    .nav-bar {
+      flex-shrink: 0;
+      padding-top: env(safe-area-inset-top);
+      height: calc(64px + env(safe-area-inset-top));
+      display: flex; align-items: center;
+      padding-left: 32px; padding-right: 32px;
+      justify-content: space-between;
+      background: transparent;
+    }
+    .restart-btn {
+      background: none; border: none; padding: 8px 0;
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      color: #000; cursor: pointer; opacity: 0.5;
+    }
+
+    /* ── Chat wrap ── */
+    .chat-wrap {
+      flex: 1; min-height: 0; position: relative;
+      display: flex; flex-direction: column;
+    }
+
+    .chat-scroll {
+      flex: 1; min-height: 0;
+      overflow-y: auto; overflow-anchor: none;
+      position: relative;
+      padding: 16px 32px 16px;
+      display: flex; flex-direction: column; gap: 24px;
+      scrollbar-width: none;
+    }
+    .chat-scroll::-webkit-scrollbar { display: none; }
+    .chat-scroll::after {
+      content: ''; display: block; flex-shrink: 0; height: 60vh;
+    }
+
+    /* ── Bubbles ── */
+    .bubble-bot {
+      font-size: 20px; line-height: 28px;
+      color: rgba(0,0,0,0.92); max-width: 100%;
+      white-space: pre-wrap;
+    }
+    .bubble-bot-hero .hero-heading {
+      font-size: 32px; font-weight: 600; line-height: 40px;
+      letter-spacing: -0.3px; color: rgba(0,0,0,0.92); margin-bottom: 16px;
+    }
+    .bubble-bot-hero .hero-body {
+      font-size: 20px; line-height: 28px; color: rgba(0,0,0,0.92);
+    }
+    .bubble-bot-hero .hero-body p + p { margin-top: 12px; }
+
+    .bubble-user {
+      scroll-margin-top: 16px;
+      align-self: flex-end;
+      background: rgba(0,0,0,0.76); color: #fff;
+      padding: 8px 24px;
+      border-radius: 16px 16px 0 16px;
+      font-size: 16px; line-height: 24px;
+      max-width: 234px; word-break: break-word;
+    }
+    .bubble-user-row {
+      display: flex; align-items: center;
+      justify-content: flex-end; gap: 8px;
+      scroll-margin-top: 16px;
+    }
+    .bubble-user-row .bubble-user { scroll-margin-top: 0; }
+    .bubble-edit-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: transparent; border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; padding: 0;
+    }
+
+    /* ── GIF bubble ── */
+    .bubble-gif {
+      align-self: flex-start; max-width: 220px; margin: 4px 0;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .bubble-gif.visible { opacity: 1; transform: translateY(0); }
+    .bubble-gif img { display: block; width: 220px; height: auto; border-radius: 18px; }
+
+    /* ── Typing indicator ── */
+    .typing-indicator {
+      display: flex; align-items: center; gap: 5px; padding: 6px 2px;
+    }
+    .typing-indicator span {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(0,0,0,0.25);
+      animation: typing-bounce 1.1s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
+    /* ── Scroll hint ── */
+    .scroll-hint-btn {
+      position: absolute; bottom: 16px; left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #fff; border: 1.5px solid rgba(0,0,0,0.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 3; opacity: 0;
+      transition: opacity 0.2s, transform 0.2s; pointer-events: none;
+    }
+    .scroll-hint-btn.visible {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    /* ── Card area ── */
+    .card-area {
+      flex-shrink: 0; padding: 0 16px 0;
+      display: flex; flex-direction: column; gap: 0;
+      background: #FBEA6B; position: relative;
+    }
+    .card-area-gradient {
+      position: absolute; top: -48px; left: 0; right: 0;
+      height: 48px;
+      background: linear-gradient(to bottom, transparent, #FBEA6B);
+      pointer-events: none; z-index: 2;
+    }
+
+    /* ── Main text input (always present) ── */
+    .text-input-card {
+      background: rgba(46, 64, 217, 0.04); border-radius: 8px;
+      padding: 10px 10px 10px 16px;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: none;
+      margin: 12px 0;
+    }
+    .text-input-card input {
+      flex: 1; border: none; outline: none; background: transparent;
+      font-family: inherit; font-size: 16px; line-height: 24px;
+      color: #111;
+      min-width: 0;
+    }
+    .text-input-card input::placeholder { color: #646872; }
+    .text-input-card input:disabled { color: #646872; }
+    .send-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #000; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: opacity 0.15s;
+    }
+    .send-btn:disabled { opacity: 0.25; cursor: default; }
+
+    /* ── Active card area (OTP / TC / agree overlays) ── */
+    #activeCard:empty { display: none; }
+    #activeCard {
+      margin-bottom: 12px;
+    }
+
+    .card {
+      background: #fff; border-radius: 12px; padding: 16px;
+      display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      animation: slideUp 0.2s ease-out;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── OTP card ── */
+    .otp-title { font-size: 17px; font-weight: 700; color: #111; }
+    .otp-boxes { display: flex; justify-content: space-between; gap: 8px; }
+    .otp-box {
+      flex: 1; aspect-ratio: 1;
+      background: #f0f0f5; border: 2.5px solid transparent; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 700; color: #111; transition: border-color 0.15s;
+    }
+    .otp-box.active { border-color: #111; background: #fff; }
+    .otp-box.filled { background: #f0f0f5; border-color: transparent; }
+    .otp-resend { font-size: 14px; color: #999; text-align: left; }
+    .otp-resend.active { color: #111; text-decoration: underline; cursor: pointer; }
+
+    /* ── TC agree card ── */
+    .tc-agree-card {
+      background: #fff; border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      animation: slideUp 0.2s ease-out;
+    }
+    .tc-agree-body {
+      padding: 14px 16px;
+      font-size: 13px; line-height: 19px; color: rgba(0,0,0,0.55);
+    }
+    .tc-agree-body a {
+      color: inherit; text-decoration: underline; cursor: pointer;
+    }
+    .tc-agree-btn {
+      display: block; width: 100%; background: #000; color: #fff;
+      border: none; border-top: none;
+      padding: 16px; font-family: inherit; font-size: 16px; font-weight: 700;
+      cursor: pointer; text-align: center;
+    }
+
+    /* ── Success overlay ── */
+    .success-overlay {
+      position: fixed; inset: 0; background: #fff;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100; opacity: 0;
+      transition: opacity 0.5s ease;
+      padding: 48px 32px; text-align: center;
+    }
+    .success-overlay.visible { opacity: 1; }
+    .success-check {
+      width: 72px; height: 72px; border-radius: 50%; background: #000;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 32px;
+    }
+    .success-headline {
+      font-size: 28px; font-weight: 700; color: #000;
+      line-height: 1.2; margin-bottom: 16px;
+    }
+    .success-sub {
+      font-size: 17px; color: rgba(0,0,0,0.55); line-height: 1.5;
+      margin-bottom: 48px; max-width: 280px;
+    }
+    .success-cta {
+      background: #000; color: #fff; border: none;
+      border-radius: 100px; padding: 16px 40px;
+      font-family: inherit; font-size: 17px; font-weight: 700;
+      cursor: pointer; width: 100%; max-width: 320px;
+    }
+
+    /* ── Edit bottom sheets ── */
+    .sheet-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s; z-index: 50;
+    }
+    .sheet-backdrop.visible { opacity: 1; pointer-events: auto; }
+    .disclosures-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-radius: 20px 20px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(.32,.72,0,1);
+      z-index: 51; max-height: 80vh; overflow-y: auto;
+    }
+    .disclosures-sheet.visible { transform: translateY(0); }
+    .sheet-handle {
+      width: 36px; height: 4px; background: #e0e0e0;
+      border-radius: 2px; margin: 12px auto 4px;
+    }
+    .sheet-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 20px 12px;
+    }
+    .sheet-title { font-size: 17px; font-weight: 700; }
+    .sheet-close {
+      background: none; border: none; font-size: 18px;
+      cursor: pointer; color: rgba(0,0,0,0.45); padding: 4px;
+    }
+    .sheet-input {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 12px;
+      padding: 14px 16px; font-family: inherit; font-size: 16px;
+      outline: none; margin-bottom: 16px;
+    }
+    .sheet-input:focus { border-color: #000; }
+    .sheet-cta {
+      width: 100%; background: #000; color: #fff; border: none;
+      border-radius: 100px; padding: 16px;
+      font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+    }
+    .sheet-cta:disabled { opacity: 0.35; }
+    .sheet-body {
+      padding: 8px 24px 48px;
+      font-size: 15px; line-height: 24px; color: rgba(0,0,0,0.7);
+    }
+    .sheet-body p + p { margin-top: 12px; }
+    .sheet-body a { color: #000; }
+
+    /* ── Quick replies ── */
+    .quick-replies {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 0 0 8px;
+    }
+
+    /* ── OTP input mode ── */
+    .otp-pill-row {
+      display: flex; flex-direction: column; align-items: flex-end;
+      gap: 8px; margin-bottom: 12px;
+    }
+    .otp-pill {
+      background: transparent; border: 1.5px solid rgba(0,0,0,0.22);
+      border-radius: 100px; padding: 8px 18px;
+      font-size: 15px; font-weight: 500; font-family: inherit;
+      cursor: pointer; color: rgba(0,0,0,0.76); transition: opacity 0.15s;
+    }
+    .otp-pill:disabled { opacity: 0.38; cursor: default; }
+    .otp-input-boxes {
+      display: flex; gap: 10px; margin-bottom: 12px;
+    }
+    .otp-input-box {
+      flex: 1; aspect-ratio: 1; border-radius: 16px;
+      background: rgba(0,0,0,0.06); border: 2.5px solid transparent;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; font-weight: 700; color: #111;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .otp-input-box.active { border-color: #111; background: #fff; }
+    .otp-input-box.filled { background: rgba(0,0,0,0.06); border-color: transparent; }
+    .otp-verify-btn {
+      width: 100%; background: #000; color: #fff; border: none;
+      border-radius: 100px; padding: 16px;
+      font-family: inherit; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s; margin-bottom: 4px;
+    }
+    .otp-verify-btn:disabled { opacity: 0.25; cursor: default; }
+    .quick-reply-btn {
+      background: transparent;
+      border: 1.5px solid rgba(0,0,0,0.76);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 500;
+      cursor: pointer;
+      color: rgba(0,0,0,0.92);
+      font-family: inherit;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .quick-reply-btn--primary {
+      background: rgba(0,0,0,0.76);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* ── Disclaimer ── */
+    .disclaimer {
+      text-align: center; font-size: 12px; color: #646872;
+      padding: 8px 0; letter-spacing: -0.25px;
+    }
+  </style>
+</head>
+<body>
+<div class="phone">
+  <div class="nav-bar">
+    <img src="Logo.svg" alt="EarnIn" height="32">
+    <button class="restart-btn" id="restartBtn">Restart chat</button>
+  </div>
+
+  <div class="chat-wrap">
+    <div class="chat-scroll" id="chatScroll"></div>
+    <button class="scroll-hint-btn" id="scrollHintBtn" aria-label="Scroll to see full message">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 3v10M4 9l5 5 5-5" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="card-area">
+    <div class="card-area-gradient"></div>
+    <div id="activeCard"></div>
+    <div class="text-input-card" id="mainInputCard">
+      <input type="text" id="mainInput" placeholder="Reply here" autocomplete="off" autocorrect="off" autocapitalize="words">
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="disclaimer">Responses generated by AI</div>
+  </div>
+</div>
+
+<!-- Phone edit sheet -->
+<div class="sheet-backdrop" id="phoneEditBackdrop"></div>
+<div class="disclosures-sheet" id="phoneEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit phone number</span>
+    <button class="sheet-close" id="phoneEditClose">&#x2715;</button>
+  </div>
+  <div style="padding: 8px 24px 48px;">
+    <input class="sheet-input" id="phoneEditInput" type="tel" placeholder="(555) 000-0000">
+    <button class="sheet-cta" id="phoneEditSave" disabled>Save</button>
+  </div>
+</div>
+
+<!-- Email edit sheet -->
+<div class="sheet-backdrop" id="emailEditBackdrop"></div>
+<div class="disclosures-sheet" id="emailEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">Edit email</span>
+    <button class="sheet-close" id="emailEditClose">&#x2715;</button>
+  </div>
+  <div style="padding: 8px 24px 48px;">
+    <input class="sheet-input" id="emailEditInput" type="email" placeholder="you@example.com">
+    <button class="sheet-cta" id="emailEditSave" disabled>Save</button>
+  </div>
+</div>
+
+<!-- Disclosures bottom sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="disclosures-sheet" id="disclosuresSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="disclosuresTitle">Agreement</span>
+    <button class="sheet-close" id="sheetClose">&#x2715;</button>
+  </div>
+  <div class="sheet-body" id="disclosuresBody"></div>
+</div>
+
+<!-- Hidden OTP input (captures keyboard on iOS) -->
+<input id="otpHidden" type="tel" inputmode="numeric" autocomplete="one-time-code"
+  style="position:fixed;top:-100px;left:0;opacity:0;font-size:16px;">
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────────────
+  const state = { step: 0, name: '', dob: '', phone: '', email: '' };
+  let generation = 0;
+  let lastUserBubble = null;
+  let phoneBubbleEl = null;
+  let emailBubbleEl = null;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  // Parse a loosely-typed DOB string into normalized MM/DD/YYYY, or null if unparseable
+  function parseDOB(raw) {
+    const s = (raw || '').trim();
+    const MONTHS = {
+      jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+      jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+      january:1, february:2, march:3, april:4, june:6,
+      july:7, august:8, september:9, october:10, november:11, december:12,
+    };
+
+    function norm(mo, d, y) {
+      mo = parseInt(mo); d = parseInt(d); y = parseInt(y);
+      if (y < 100) y = y <= 29 ? 2000 + y : 1900 + y;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > new Date().getFullYear()) return null;
+      return `${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}/${y}`;
+    }
+
+    // Digits only: 8 → MMDDYYYY, 6 → MMDDYY (only when no separators present)
+    const digits = s.replace(/\D/g, '');
+    if (/^\d+$/.test(s)) {
+      if (digits.length === 8) { const r = norm(digits.slice(0,2), digits.slice(2,4), digits.slice(4,8)); if (r) return r; }
+      if (digits.length === 6) { const r = norm(digits.slice(0,2), digits.slice(2,4), digits.slice(4,6)); if (r) return r; }
+    }
+
+    // YYYY-MM-DD (ISO) — check before the generic slash/dash pattern
+    let m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) return norm(m[2], m[3], m[1]);
+
+    // MM/DD/YYYY  M/D/YY  (slash, dash, or dot separator)
+    m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+    if (m) return norm(m[1], m[2], m[3]);
+
+    // "Month D, YYYY"  /  "Month D YYYY"
+    m = s.match(/^([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{2,4})$/);
+    if (m) {
+      const mo = MONTHS[m[1].toLowerCase()] || MONTHS[m[1].toLowerCase().slice(0,3)];
+      if (mo) return norm(mo, m[2], m[3]);
+    }
+
+    // "D Month YYYY"
+    m = s.match(/^(\d{1,2})\s+([A-Za-z]+)[,\s]+(\d{2,4})$/);
+    if (m) {
+      const mo = MONTHS[m[2].toLowerCase()] || MONTHS[m[2].toLowerCase().slice(0,3)];
+      if (mo) return norm(mo, m[1], m[3]);
+    }
+
+    return null;
+  }
+
+  function isValidDOB(v) {
+    const normalized = parseDOB(v);
+    if (!normalized) return false;
+    const [mo, d, yr] = normalized.split('/');
+    const date = new Date(`${mo}/${d}/${yr}`);
+    if (isNaN(date.getTime())) return false;
+    const age = (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    return age >= 18 && age < 120;
+  }
+
+  function formatPhone(raw) {
+    const d = raw.replace(/\D/g, '').slice(0, 10);
+    if (d.length < 4) return d;
+    if (d.length < 7) return `(${d.slice(0,3)}) ${d.slice(3)}`;
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  }
+
+  function isYes(v) { return /^(yes|yeah|yep|sure|ok|okay|y|yup|absolutely|definitely)$/i.test(v.trim()); }
+  function isNo(v)  { return /^(no|nope|nah|n|pass|skip|not now)$/i.test(v.trim()); }
+
+  // ── Flow ──────────────────────────────────────────────────────────────────
+  // Each step is either a TEXT step (uses main input) or a CARD step (special UI).
+  // TEXT steps: { botMsg, placeholder, inputType, validate, errorMsg, onSubmit, postSubmit? }
+  // CARD steps: { card: 'otp'|'tc1'|'tc'|'done', botMsg?, ... }
+  const flow = [
+    // ── 0: Hero intro ─────────────────────────────────────────────────────────
+    {
+      botMsgStyle: 'hero',
+      botMsg: "You should get paid while you work – not days or weeks later.",
+      botMsgBody: "At EarnIn, we're making this a reality.\n\nReady to access the pay you've already earned?",
+      card: 'quick',
+      options: ['Yes, I want my pay faster 💸', 'Why are paychecks every two weeks? 💡'],
+      onSubmit(val) {
+        if (val === 'Yes, I want my pay faster 💸') state.step += 2;
+      },
+    },
+    // ── 1: Educational turn 1 ────────────────────────────────────────────────
+    {
+      botMsg: "Moving cash to thousands of workers used to be a massive logistical operation, so batching payroll every two weeks was the only practical solution.\n\nThat system stuck around long after money went digital — which is why most people are still waiting on a 150-year-old pay cycle.",
+      card: 'quick',
+      options: ['How is EarnIn changing that?'],
+      onSubmit() {},
+    },
+    // ── 2: Educational pivot ─────────────────────────────────────────────────
+    {
+      botMsg: "EarnIn lets you access what you've already earned — before payday. When you tap Cash Out, you're not borrowing anything. You're just getting paid for the hours you've already worked.",
+      card: 'quick',
+      options: ['Yes, I want my pay faster 💸'],
+      onSubmit() {},
+    },
+    // ── 3: Cash Out intro ────────────────────────────────────────────────────
+    {
+      botMsg: "Awesome! You are on the path to real-time pay. If you need money right away, Cash Out is a great place to start. You can access money you've already earned before payday with no interest or mandatory costs.\n\nBefore we get started, here are our [disclosures](#disclosures). Feel free to ask me anything along the way.",
+      card: 'quick',
+      options: ['How does Cash Out work?', { label: 'Get started with Cash Out', primary: true }],
+      onSubmit() {},
+    },
+    // ── 4: Name ───────────────────────────────────────────────────────────────
+    {
+      botMsg: "Perfect, let's get you set up! First, what's your legal first and last name?\n\nEnter it as it appears on your ID.",
+      placeholder: "First and last name",
+      inputType: 'text',
+      autocapitalize: 'words',
+      validate: v => v.trim().split(/\s+/).filter(Boolean).length >= 2 && v.trim().length >= 3,
+      errorMsg: "Please enter both your first and last name.",
+      onSubmit(v) { state.name = v.trim(); },
+    },
+    // ── 5: Date of birth ─────────────────────────────────────────────────────
+    {
+      botMsg: s => `Hi ${s.name.split(' ')[0]}! 👋\n\nNext up — your date of birth. I use this to confirm you meet the age requirement to use EarnIn.\n\n🔒 Your data is encrypted and never sold or shared.`,
+      onSubmit(v) { state.dob = parseDOB(v.trim()) || v.trim(); },
+    },
+    // ── 6: Verify info card ───────────────────────────────────────────────────
+    {
+      botMsg: "Let me confirm what I have so far.",
+      card: 'verify',
+      onSubmit() {},
+    },
+    // ── 7: Phone ─────────────────────────────────────────────────────────────
+    {
+      botMsg: "Perfect! What's your phone number? I'll text you a verification code.",
+      validate: v => v.replace(/\D/g,'').length === 10,
+      errorMsg: () => "Hmm, that doesn't look right — I need a 10-digit US number. Could you try again? (e.g. 555-867-5309)",
+      onSubmit(v) { state.phone = v.replace(/\D/g,'').slice(0,10); },
+      postSubmit() { phoneBubbleEl = lastUserBubble; },
+    },
+    // ── 8: Phone OTP ─────────────────────────────────────────────────────────
+    {
+      botMsg: s => `I just texted you a 4-digit code to ${formatPhone(s.phone)}. Enter it below to confirm your number.`,
+      card: 'otp',
+      otpType: 'phone',
+      subtitle: () => formatPhone(state.phone),
+      onSubmit() {},
+      postSubmit() {},
+    },
+    // ── 9: Email ─────────────────────────────────────────────────────────────
+    {
+      botMsg: "What's your email? This will help add an extra layer of security to your account.",
+      validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()),
+      errorMsg: () => "That email doesn't look quite right — make sure it has an @ and a domain, like you@example.com. Want to try again?",
+      onSubmit(v) { state.email = v.trim(); },
+      postSubmit() { emailBubbleEl = lastUserBubble; },
+    },
+    // ── 10: Email OTP ─────────────────────────────────────────────────────────
+    {
+      botMsg: s => `Got it! I sent a verification code to ${s.email}. Check your inbox — if you don't see it, look in spam.`,
+      card: 'otp',
+      otpType: 'email',
+      subtitle: () => state.email,
+      onSubmit() {},
+      postSubmit() {},
+    },
+    // ── 11: TC1 — Electronic Communications ──────────────────────────────────
+    {
+      botMsg: "Almost there — just a few quick agreements.\n\nThe first one covers how EarnIn may contact you and confirms you're okay receiving account-related messages by text or email.\n\nDo you agree to EarnIn's [Electronic Communications Agreement](#) and to receive transactional SMS?",
+      card: 'quick',
+      options: [
+        { label: 'Learn more', noAdvance: true },
+        { label: 'I agree', primary: true, agreeText: 'I agree to the Electronic Communications Agreement and to receive transactional SMS' },
+      ],
+      learnMore: {
+        chatMsg: "The Electronic Communications Agreement authorizes EarnIn to contact you by text and email for account notifications, transaction confirmations, security alerts, and service updates.\n\nMessage and data rates may apply. You can withdraw consent at any time by contacting support.",
+      },
+      onSubmit() {},
+    },
+    // ── 12: TC2 — Terms & Privacy ─────────────────────────────────────────────
+    {
+      botMsg: "This one covers the core rules for using the product and how your data is handled.\n\nDo you agree to EarnIn's [General Terms of Service](#) and [Privacy Documents](#)?",
+      card: 'quick',
+      options: [
+        { label: 'Learn more', noAdvance: true },
+        { label: 'I agree', primary: true, agreeText: 'I agree to the General Terms of Service and Privacy Documents' },
+      ],
+      learnMore: {
+        chatMsg: "The General Terms of Service covers how you use EarnIn products — your rights, eligibility, and how disputes are resolved.\n\nThe Privacy Documents explain how EarnIn collects and uses your data, including income and bank info. EarnIn does not sell your data to third parties.",
+      },
+      onSubmit() {},
+    },
+    // ── 13: TC3 — Optional SMS opt-in ────────────────────────────────────────
+    {
+      botMsg: "Last one — would you like to receive money tips and offers by text? This is completely optional.",
+      card: 'quick',
+      options: [{ label: 'Yes, sign me up', primary: true }, 'No thanks'],
+      onSubmit() {},
+    },
+    // ── 14: Push notifications ────────────────────────────────────────────────
+    {
+      botMsg: "Would you like to enable push notifications so I can keep you updated?",
+      card: 'quick',
+      options: [{ label: 'Yes, notify me', primary: true }, 'Not now'],
+      requestPermission: true,
+      onSubmit() {},
+    },
+    // ── 15: Attribution ───────────────────────────────────────────────────────
+    {
+      botMsg: "One last thing. How did you hear about EarnIn?",
+      card: 'attribution',
+      onSubmit() {},
+    },
+    // ── 16: Done ─────────────────────────────────────────────────────────────
+    {
+      gifMsg: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
+      botMsg: "🎉 Your EarnIn account is created!\n\nHere's what's next:\n\n1. Connect your bank account\n2. Verify your employment\n3. Cash Out your first advance",
+      card: 'continue',
+    },
+  ];
+
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const chatScroll    = document.getElementById('chatScroll');
+  const activeCard    = document.getElementById('activeCard');
+  const mainInputCard = document.getElementById('mainInputCard');
+  const mainInput     = document.getElementById('mainInput');
+  const sendBtn       = document.getElementById('sendBtn');
+  const scrollHintBtn = document.getElementById('scrollHintBtn');
+  const otpHidden     = document.getElementById('otpHidden');
+
+  // ── Typewriter ────────────────────────────────────────────────────────────
+  function typeText(el, text, outerEl, autoScroll) {
+    return new Promise(resolve => {
+      const tokens = [];
+      const re = /(\n\n|\[([^\]]+)\]\(([^)]+)\))/g;
+      let pos = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        for (let i = pos; i < m.index; i++) tokens.push({ t: 'c', v: text[i] });
+        if (m[0] === '\n\n') tokens.push({ t: 'br' });
+        else tokens.push({ t: 'a', label: m[2], url: m[3] });
+        pos = m.index + m[0].length;
+      }
+      for (let i = pos; i < text.length; i++) tokens.push({ t: 'c', v: text[i] });
+
+      const charCount = tokens.filter(t => t.t === 'c').length;
+      const msPerChar = charCount <= 1 ? 0 : Math.min(10, Math.max(3, 1500 / charCount));
+
+      let i = 0;
+      function tick() {
+        if (i >= tokens.length) { resolve(); return; }
+        const tok = tokens[i++];
+        if (tok.t === 'c') {
+          if (el.lastChild?.nodeType === Node.TEXT_NODE) el.lastChild.textContent += tok.v;
+          else el.appendChild(document.createTextNode(tok.v));
+        } else if (tok.t === 'br') {
+          el.appendChild(document.createElement('br'));
+          el.appendChild(document.createElement('br'));
+        } else {
+          const a = document.createElement('a');
+          a.href = tok.url; a.target = '_blank';
+          a.style.cssText = 'color:inherit;text-decoration:underline;cursor:pointer;';
+          a.textContent = tok.label;
+          el.appendChild(a);
+        }
+        if (autoScroll) {
+          const ref = outerEl || el;
+          const bottom = ref.offsetTop + ref.offsetHeight;
+          const target = bottom - chatScroll.clientHeight + 32;
+          if (target > chatScroll.scrollTop) chatScroll.scrollTop = target;
+        }
+        setTimeout(tick, msPerChar);
+      }
+      tick();
+    });
+  }
+
+  function addBotMsg(text, style, bodyText) {
+    return new Promise(resolve => {
+      const indicator = document.createElement('div');
+      indicator.className = 'bubble-bot typing-indicator';
+      indicator.innerHTML = '<span></span><span></span><span></span>';
+      indicator.style.cssText = 'opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s';
+      chatScroll.appendChild(indicator);
+      if (!lastUserBubble) chatScroll.scrollTop = chatScroll.scrollHeight;
+      requestAnimationFrame(() => { indicator.style.opacity='1'; indicator.style.transform='translateY(0)'; });
+
+      setTimeout(async () => {
+        indicator.remove();
+        const el = document.createElement('div');
+        el.style.cssText = 'opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s';
+        chatScroll.appendChild(el);
+        const autoScroll = !!lastUserBubble;
+        await new Promise(r => requestAnimationFrame(() => { el.style.opacity='1'; el.style.transform='translateY(0)'; setTimeout(r, 80); }));
+
+        if (style === 'hero') {
+          el.className = 'bubble-bot-hero';
+          const heading = document.createElement('div');
+          heading.className = 'hero-heading';
+          el.appendChild(heading);
+          await typeText(heading, text, el, autoScroll);
+          if (bodyText) {
+            const body = document.createElement('div');
+            body.className = 'hero-body';
+            el.appendChild(body);
+            for (const para of bodyText.split('\n\n')) {
+              const p = document.createElement('p');
+              body.appendChild(p);
+              await typeText(p, para, el, autoScroll);
+            }
+          }
+        } else {
+          el.className = 'bubble-bot';
+          await typeText(el, text, el, autoScroll);
+        }
+
+        updateScrollHint();
+        resolve(el);
+      }, 500);
+    });
+  }
+
+  function addUserMsg(text) {
+    const el = document.createElement('div');
+    el.className = 'bubble-user';
+    el.textContent = text;
+    chatScroll.appendChild(el);
+    lastUserBubble = el;
+    return el;
+  }
+
+  function attachEditBtn(bubbleOrRow, onClick) {
+    if (!bubbleOrRow || !onClick) return;
+    const bubble = bubbleOrRow.classList.contains('bubble-user') ? bubbleOrRow : null;
+    if (!bubble) return;
+    const row = document.createElement('div');
+    row.className = 'bubble-user-row';
+    bubble.parentNode.insertBefore(row, bubble);
+    row.appendChild(bubble);
+    const btn = document.createElement('button');
+    btn.className = 'bubble-edit-btn';
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5a1.414 1.414 0 012 2L3.5 10.5 1 11l.5-2.5 7-7z" stroke="#555" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    row.insertBefore(btn, bubble);
+    btn.addEventListener('click', onClick);
+    lastUserBubble = row;
+  }
+
+  function scrollToBubbleTop(el) {
+    if (!el) return;
+    chatScroll.scrollTop = el.offsetTop - 16;
+  }
+
+  // ── OTP card (replaces main input with digit boxes) ───────────────────────
+  function renderOtpCard(step) {
+    mainInputCard.style.display = 'none';
+    activeCard.innerHTML = '';
+
+    // Replace hidden input to clear previous listeners
+    const oldHidden = document.getElementById('otpHidden');
+    const freshHidden = oldHidden.cloneNode(false);
+    oldHidden.parentNode.replaceChild(freshHidden, oldHidden);
+
+    const dest = typeof step.subtitle === 'function' ? step.subtitle() : (step.subtitle || '');
+    const isPhone = step.otpType === 'phone';
+
+    // Pill buttons: Resend + Edit
+    const pillRow = document.createElement('div');
+    pillRow.className = 'otp-pill-row';
+
+    const resendBtn = document.createElement('button');
+    resendBtn.className = 'otp-pill';
+    resendBtn.disabled = true;
+    let countdown = 30;
+    resendBtn.textContent = `Resend code (0:${String(countdown).padStart(2,'0')})`;
+    const timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        resendBtn.textContent = `Resend code (0:${String(countdown).padStart(2,'0')})`;
+      } else {
+        clearInterval(timer);
+        resendBtn.textContent = 'Resend code';
+        resendBtn.disabled = false;
+        resendBtn.addEventListener('click', () => {
+          countdown = 30;
+          resendBtn.textContent = `Resend code (0:30)`;
+          resendBtn.disabled = true;
+          const t2 = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+              resendBtn.textContent = `Resend code (0:${String(countdown).padStart(2,'0')})`;
+            } else {
+              clearInterval(t2);
+              resendBtn.textContent = 'Resend code';
+              resendBtn.disabled = false;
+            }
+          }, 1000);
+        }, { once: true });
+      }
+    }, 1000);
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'otp-pill';
+    editBtn.textContent = isPhone ? 'Edit phone number' : 'Edit email';
+    editBtn.addEventListener('click', () => {
+      clearInterval(timer);
+      hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
+      document.body.appendChild(hiddenInput);
+      activeCard.innerHTML = '';
+      mainInputCard.style.display = '';
+      mainInput.disabled = false;
+      if (isPhone) openPhoneEdit();
+      else openEmailEdit();
+    });
+
+    pillRow.appendChild(resendBtn);
+    pillRow.appendChild(editBtn);
+    activeCard.appendChild(pillRow);
+
+    // Digit boxes
+    const boxesRow = document.createElement('div');
+    boxesRow.className = 'otp-input-boxes';
+    const boxEls = [0,1,2,3].map(i => {
+      const box = document.createElement('div');
+      box.className = 'otp-input-box' + (i === 0 ? ' active' : '');
+      boxesRow.appendChild(box);
+      return box;
+    });
+    activeCard.appendChild(boxesRow);
+
+    const hiddenInput = document.getElementById('otpHidden');
+    hiddenInput.setAttribute('inputmode', 'numeric');
+    hiddenInput.setAttribute('type', 'tel');
+    hiddenInput.value = '';
+    // Move physically into activeCard so browser sees it as in-viewport
+    hiddenInput.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+    activeCard.appendChild(hiddenInput);
+    let submitted = false;
+
+    function updateBoxes() {
+      const val = hiddenInput.value.replace(/\D/g,'').slice(0,4);
+      hiddenInput.value = val;
+      boxEls.forEach((box, i) => {
+        box.textContent = val[i] || '';
+        box.classList.toggle('filled', !!val[i]);
+        box.classList.toggle('active', i === val.length && val.length < 4);
+      });
+      if (val.length >= 4 && !submitted) {
+        submitted = true;
+        clearInterval(timer);
+        setTimeout(() => {
+          const code = hiddenInput.value;
+          hiddenInput.value = '';
+          // Restore hidden input to body (off-screen) before clearing activeCard
+          hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
+          document.body.appendChild(hiddenInput);
+          activeCard.innerHTML = '';
+          mainInputCard.style.display = '';
+          mainInput.disabled = false;
+          if (step.onSubmit) step.onSubmit(code);
+          if (step.postSubmit) step.postSubmit();
+          advanceFromCard(`${code[0]} ${code[1]} ${code[2]} ${code[3]}`);
+        }, 300);
+      }
+    }
+
+    hiddenInput.addEventListener('input', updateBoxes);
+    hiddenInput.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
+    boxesRow.addEventListener('click', () => hiddenInput.focus());
+    boxesRow.addEventListener('touchstart', () => hiddenInput.focus(), { passive: true });
+    // Focus immediately and again after brief delay for WebView compatibility
+    hiddenInput.focus();
+    setTimeout(() => hiddenInput.focus(), 50);
+    setTimeout(() => hiddenInput.focus(), 300);
+    updateBoxes();
+  }
+
+  // ── TC cards ──────────────────────────────────────────────────────────────
+  function renderTc1Card() {
+    mainInput.disabled = true;
+    activeCard.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tc-agree-card';
+    const body = document.createElement('div');
+    body.className = 'tc-agree-body';
+    body.innerHTML = 'I agree to the <a href="#">Electronic Communications Agreement</a> and to receive transactional SMS.';
+    const btn = document.createElement('button');
+    btn.className = 'tc-agree-btn';
+    btn.textContent = 'I agree →';
+    wrap.appendChild(body);
+    wrap.appendChild(btn);
+    activeCard.appendChild(wrap);
+    btn.addEventListener('click', () => {
+      activeCard.innerHTML = '';
+      mainInput.disabled = false;
+      advanceFromCard('I agree to the Electronic Communications Agreement');
+    });
+  }
+
+  function renderTcCard() {
+    mainInput.disabled = true;
+    activeCard.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tc-agree-card';
+    const body = document.createElement('div');
+    body.className = 'tc-agree-body';
+
+    // Optional SMS checkbox
+    let optIn = false;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;';
+    const cb = document.createElement('div');
+    cb.style.cssText = 'width:20px;height:20px;border-radius:5px;border:1.5px solid #ccc;flex-shrink:0;cursor:pointer;margin-top:1px;display:flex;align-items:center;justify-content:center;';
+    const cbText = document.createElement('div');
+    cbText.style.cssText = 'font-size:13px;line-height:18px;color:rgba(0,0,0,0.55);';
+    cbText.textContent = 'Optional: Receive money tips and offers by text.';
+    cb.addEventListener('click', () => {
+      optIn = !optIn;
+      cb.style.background = optIn ? '#000' : '';
+      cb.style.borderColor = optIn ? '#000' : '#ccc';
+      cb.innerHTML = optIn ? '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' : '';
+    });
+    row.appendChild(cb); row.appendChild(cbText);
+
+    body.innerHTML = 'I agree to the <a href="#">General Terms of Service</a> and <a href="#">Privacy Documents</a>.';
+    body.appendChild(row);
+
+    const btn = document.createElement('button');
+    btn.className = 'tc-agree-btn';
+    btn.textContent = 'I agree →';
+    wrap.appendChild(body);
+    wrap.appendChild(btn);
+    activeCard.appendChild(wrap);
+    btn.addEventListener('click', () => {
+      activeCard.innerHTML = '';
+      mainInput.disabled = false;
+      let msg = 'I agree to the General Terms of Service and Privacy Documents';
+      if (optIn) msg += ', and to receive text offers';
+      advanceFromCard(msg);
+    });
+  }
+
+  // ── Done card ─────────────────────────────────────────────────────────────
+  function renderDoneCard() {
+    mainInput.disabled = true;
+    activeCard.innerHTML = '';
+    setTimeout(() => {
+      const overlay = document.createElement('div');
+      overlay.className = 'success-overlay';
+      const check = document.createElement('div');
+      check.className = 'success-check';
+      check.innerHTML = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M7 16.5l6 6 12-13" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const hl = document.createElement('div');
+      hl.className = 'success-headline';
+      hl.textContent = "You're all set!";
+      const sub = document.createElement('div');
+      sub.className = 'success-sub';
+      sub.textContent = `Welcome to EarnIn, ${state.name.split(' ')[0]}. Connect your bank to unlock your first Cash Out.`;
+      const cta = document.createElement('button');
+      cta.className = 'success-cta';
+      cta.textContent = 'Connect my bank';
+      overlay.append(check, hl, sub, cta);
+      document.querySelector('.phone').appendChild(overlay);
+      setTimeout(() => overlay.classList.add('visible'), 50);
+    }, 600);
+  }
+
+  function renderQuickReplies(step) {
+    // Hide the text input while QRs are showing
+    mainInputCard.style.display = 'none';
+    activeCard.innerHTML = '';
+    const container = document.createElement('div');
+    container.className = 'quick-replies';
+
+    step.options.forEach((opt, idx) => {
+      const label   = typeof opt === 'string' ? opt : opt.label;
+      const primary = typeof opt === 'object' && opt.primary;
+      const btn = document.createElement('button');
+      btn.className = 'quick-reply-btn' + (primary ? ' quick-reply-btn--primary' : '');
+      btn.textContent = label;
+      btn.style.cssText = `opacity:0;transform:translateY(6px);transition:opacity 0.18s ease ${idx * 55}ms,transform 0.18s ease ${idx * 55}ms`;
+
+      btn.addEventListener('click', async () => {
+        if (opt.noAdvance) {
+          // Learn more: show content as bot message, then re-render just "I agree"
+          if (step.learnMore?.chatMsg) {
+            container.querySelectorAll('button').forEach(b => b.disabled = true);
+            activeCard.innerHTML = '';
+            await addBotMsg(step.learnMore.chatMsg);
+            // Re-render only the primary (I agree) button
+            const agreeOpt = step.options.find(o => typeof o === 'object' && o.primary);
+            if (agreeOpt) renderQuickReplies({ ...step, options: [agreeOpt] });
+          }
+          return;
+        }
+        container.querySelectorAll('button').forEach(b => b.disabled = true);
+        if (step.requestPermission) {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            await Notification.requestPermission().catch(() => {});
+          }
+        }
+        activeCard.innerHTML = '';
+        mainInputCard.style.display = '';
+        const displayText = (typeof opt === 'object' && opt.agreeText) ? opt.agreeText : label;
+        advanceFromCard(displayText);
+      });
+      container.appendChild(btn);
+    });
+
+    activeCard.appendChild(container);
+
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.quick-reply-btn').forEach(btn => {
+        btn.style.opacity = '1';
+        btn.style.transform = 'translateY(0)';
+      });
+    });
+  }
+
+  // ── Attribution card ──────────────────────────────────────────────────────
+  function renderAttributionCard() {
+    _buildAttributionList(false);
+  }
+
+  function _buildAttributionList(isSocialDrill) {
+    activeCard.innerHTML = '';
+    mainInput.disabled = true;
+
+    const SOURCES = isSocialDrill
+      ? ['Facebook / Instagram', 'TikTok', 'Reddit', 'Snapchat']
+      : ['Family or friends', 'Social media', 'YouTube', 'Radio',
+         'Podcast', 'TV', 'App store or Google', 'Other app/service', 'My employer'];
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'padding:0;gap:0;overflow:hidden;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px;';
+
+    if (isSocialDrill) {
+      const backBtn = document.createElement('button');
+      backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 14L6 9l5-5" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      backBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;';
+      backBtn.addEventListener('click', () => _buildAttributionList(false));
+      header.appendChild(backBtn);
+    } else {
+      header.appendChild(document.createElement('span'));
+    }
+
+    const skipBtn = document.createElement('button');
+    skipBtn.textContent = 'Skip';
+    skipBtn.style.cssText = 'background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);cursor:pointer;padding:4px 0;';
+    skipBtn.addEventListener('click', () => { activeCard.innerHTML = ''; mainInput.disabled = false; advanceFromCard('Skip'); });
+    header.appendChild(skipBtn);
+    card.appendChild(header);
+
+    const list = document.createElement('div');
+    list.style.cssText = 'max-height:240px;overflow-y:auto;border-top:1px solid #f0f0f0;';
+
+    SOURCES.forEach(label => {
+      const row = document.createElement('button');
+      row.textContent = label;
+      row.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid #f0f0f0;padding:14px 16px;font-family:inherit;font-size:16px;color:#111;cursor:pointer;';
+      row.addEventListener('click', () => {
+        if (!isSocialDrill && label === 'Social media') {
+          _buildAttributionList(true);
+        } else {
+          activeCard.innerHTML = '';
+          mainInput.disabled = false;
+          advanceFromCard(label);
+        }
+      });
+      list.appendChild(row);
+    });
+
+    // Other input row at bottom of scroll
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid #f0f0f0;';
+    const otherInput = document.createElement('input');
+    otherInput.type = 'text';
+    otherInput.placeholder = 'Other';
+    otherInput.style.cssText = 'flex:1;border:none;outline:none;font-family:inherit;font-size:16px;background:transparent;';
+    const otherBtn = document.createElement('button');
+    otherBtn.className = 'send-btn';
+    otherBtn.disabled = true;
+    otherBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3 8l5-5 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    otherInput.addEventListener('input', () => { otherBtn.disabled = otherInput.value.trim().length < 1; });
+    const submitOther = () => {
+      const v = otherInput.value.trim();
+      if (!v) return;
+      activeCard.innerHTML = '';
+      mainInput.disabled = false;
+      advanceFromCard(v);
+    };
+    otherBtn.addEventListener('click', submitOther);
+    otherInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !otherBtn.disabled) submitOther(); });
+    inputRow.appendChild(otherInput);
+    inputRow.appendChild(otherBtn);
+    list.appendChild(inputRow);
+    card.appendChild(list);
+
+    activeCard.appendChild(card);
+  }
+
+  // ── Verify info card ────────────────────────────────────────────────────
+  function renderVerifyCard() {
+    mainInput.disabled = true;
+    // Hide input row so card covers that space
+    mainInputCard.style.display = 'none';
+    activeCard.innerHTML = '';
+
+    function done() {
+      activeCard.innerHTML = '';
+      mainInputCard.style.display = '';
+      mainInput.disabled = false;
+    }
+
+    function formatDOBDisplay(dob) {
+      const months = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+      const m = dob.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (!m) return dob;
+      const mo = parseInt(m[1]) - 1;
+      const d  = parseInt(m[2]);
+      const y  = m[3].length === 2 ? '19' + m[3] : m[3];
+      return `${months[mo]} ${d}, ${y}`;
+    }
+
+    // Split state.name into first / last
+    function splitName(full) {
+      const parts = full.trim().split(/\s+/);
+      return { first: parts[0] || '', last: parts.slice(1).join(' ') };
+    }
+
+    function makeLabel(text) {
+      const l = document.createElement('div');
+      l.style.cssText = 'font-size:11px;font-weight:600;color:rgba(0,0,0,0.4);text-transform:uppercase;letter-spacing:0.6px;';
+      l.textContent = text;
+      return l;
+    }
+
+    function buildViewMode() {
+      activeCard.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cssText = 'gap:14px;border-radius:16px;';
+
+      const heading = document.createElement('div');
+      heading.style.cssText = 'font-size:16px;font-weight:600;color:#111;';
+      heading.textContent = 'Does this look right?';
+      card.appendChild(heading);
+
+      const { first, last } = splitName(state.name);
+      [
+        { label: 'First name',    value: first },
+        { label: 'Last name',     value: last || '—' },
+        { label: 'Date of birth', value: formatDOBDisplay(state.dob) },
+      ].forEach(({ label, value }) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+        const v = document.createElement('div');
+        v.style.cssText = 'font-size:17px;font-weight:500;color:#111;';
+        v.textContent = value;
+        row.appendChild(makeLabel(label));
+        row.appendChild(v);
+        card.appendChild(row);
+      });
+
+      const ctaRow = document.createElement('div');
+      ctaRow.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-top:4px;';
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.style.cssText = 'padding:10px 20px;border-radius:100px;border:1.5px solid rgba(0,0,0,0.2);background:transparent;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:#111;';
+      editBtn.addEventListener('click', buildEditMode);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.textContent = "That's correct";
+      confirmBtn.style.cssText = 'padding:10px 20px;border-radius:100px;border:none;background:#000;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;';
+      confirmBtn.addEventListener('click', () => {
+        done();
+        advanceFromCard("That's correct");
+      });
+
+      ctaRow.appendChild(editBtn);
+      ctaRow.appendChild(confirmBtn);
+      card.appendChild(ctaRow);
+      activeCard.appendChild(card);
+    }
+
+    function buildEditMode() {
+      activeCard.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cssText = 'gap:12px;border-radius:16px;';
+
+      function makeField(labelText, value, placeholder, inputmode) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.value = value; inp.placeholder = placeholder;
+        if (inputmode) inp.setAttribute('inputmode', inputmode);
+        inp.style.cssText = 'width:100%;border:1.5px solid #e0e0e0;border-radius:10px;padding:11px 14px;font-family:inherit;font-size:16px;outline:none;background:#fff;box-sizing:border-box;';
+        inp.addEventListener('focus', () => inp.style.borderColor = '#000');
+        inp.addEventListener('blur',  () => inp.style.borderColor = '#e0e0e0');
+        wrap.appendChild(makeLabel(labelText));
+        wrap.appendChild(inp);
+        return { wrap, inp };
+      }
+
+      function normalizeDOB(dob) {
+        const m = dob.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (!m) return dob;
+        const y = m[3].length === 2 ? '19' + m[3] : m[3];
+        return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${y}`;
+      }
+
+      const { first, last } = splitName(state.name);
+      const { wrap: firstWrap, inp: firstInp } = makeField('First name', first, 'First name', null);
+      const { wrap: lastWrap,  inp: lastInp  } = makeField('Last name',  last,  'Last name',  null);
+      const { wrap: dobWrap,   inp: dobInp   } = makeField('Date of birth', normalizeDOB(state.dob), 'MM/DD/YYYY', 'numeric');
+
+      // Format hint below DOB
+      const dobHint = document.createElement('div');
+      dobHint.style.cssText = 'font-size:12px;color:rgba(0,0,0,0.4);margin-top:-4px;';
+      dobHint.textContent = 'MM/DD/YYYY';
+      dobWrap.appendChild(dobHint);
+
+      const dobError = document.createElement('div');
+      dobError.style.cssText = 'font-size:13px;color:#c0392b;display:none;margin-top:-4px;';
+      dobError.textContent = 'Please enter a valid date. You must be at least 18.';
+      dobWrap.appendChild(dobError);
+
+      // Auto-format DOB as user types — skip reformatting on deletion
+      let prevDobLen = dobInp.value.length;
+      dobInp.addEventListener('input', () => {
+        const currentLen = dobInp.value.length;
+        const isDeleting = currentLen < prevDobLen;
+        prevDobLen = currentLen;
+        if (!isDeleting) {
+          let raw = dobInp.value.replace(/\D/g,'');
+          if (raw.length > 2) raw = raw.slice(0,2) + '/' + raw.slice(2);
+          if (raw.length > 5) raw = raw.slice(0,5) + '/' + raw.slice(5,9);
+          dobInp.value = raw;
+          prevDobLen = dobInp.value.length;
+        }
+        dobError.style.display = 'none';
+        dobInp.style.borderColor = '#000';
+      });
+
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save';
+      saveBtn.style.cssText = 'width:100%;padding:14px;border-radius:100px;border:none;background:#000;color:#fff;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;';
+
+      saveBtn.addEventListener('click', async () => {
+        const newFirst = firstInp.value.trim();
+        const newLast  = lastInp.value.trim();
+        const newName  = [newFirst, newLast].filter(Boolean).join(' ');
+        const newDob   = dobInp.value.trim();
+        if (!isValidDOB(newDob)) {
+          dobError.style.display = 'block';
+          dobInp.style.borderColor = '#c0392b';
+          return;
+        }
+        state.name = newName;
+        state.dob  = newDob;
+        done();
+        addUserMsg(`${newName} · ${formatDOBDisplay(newDob)}`);
+        requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
+        const gen = generation;
+        await addBotMsg("Got it — I've updated your info!");
+        if (generation !== gen) return;
+        await runNextStep();
+      });
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.cssText = 'width:100%;padding:11px;border-radius:100px;border:none;background:transparent;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;color:rgba(0,0,0,0.4);';
+      cancelBtn.addEventListener('click', buildViewMode);
+
+      card.appendChild(firstWrap);
+      card.appendChild(lastWrap);
+      card.appendChild(dobWrap);
+      card.appendChild(saveBtn);
+      card.appendChild(cancelBtn);
+      activeCard.appendChild(card);
+      firstInp.focus();
+    }
+
+    buildViewMode();
+  }
+
+  function addGifBubble(url) {
+    return new Promise(resolve => {
+      const indicator = document.createElement('div');
+      indicator.className = 'typing-indicator';
+      indicator.style.cssText = 'opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s;';
+      chatScroll.appendChild(indicator);
+      requestAnimationFrame(() => { indicator.style.opacity='1'; indicator.style.transform='translateY(0)'; });
+      chatScroll.scrollTop = chatScroll.scrollHeight;
+      setTimeout(() => {
+        indicator.remove();
+        const el = document.createElement('div');
+        el.className = 'bubble-gif';
+        const img = document.createElement('img');
+        img.src = url; img.alt = 'Celebration';
+        el.appendChild(img);
+        chatScroll.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('visible'));
+        chatScroll.scrollTop = chatScroll.scrollHeight;
+        resolve(el);
+      }, 600);
+    });
+  }
+
+  function renderContinueCard() {
+    mainInputCard.style.display = 'none';
+    activeCard.innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'success-cta';
+    btn.style.cssText = 'width:100%;max-width:none;opacity:0;transform:translateY(4px);transition:opacity 0.2s,transform 0.2s;';
+    btn.textContent = 'Continue set up';
+    activeCard.appendChild(btn);
+    requestAnimationFrame(() => { btn.style.opacity='1'; btn.style.transform='translateY(0)'; });
+  }
+
+  function renderCard(step) {
+    switch (step.card) {
+      case 'otp':         renderOtpCard(step);       break;
+      case 'verify':      renderVerifyCard();         break;
+      case 'tc1':         renderTc1Card();            break;
+      case 'tc':          renderTcCard();             break;
+      case 'quick':       renderQuickReplies(step);   break;
+      case 'attribution': renderAttributionCard();    break;
+      case 'continue':    renderContinueCard();        break;
+      case 'done':        renderDoneCard();           break;
+    }
+    requestAnimationFrame(() => updateScrollHint());
+  }
+
+  // ── Input setup ───────────────────────────────────────────────────────────
+  function applyStepToInput(step) {
+    if (!step || step.card) return;
+    mainInputCard.style.display = '';   // restore if hidden by QR/verify step
+    mainInput.type = 'text';
+    mainInput.placeholder = 'Reply here';
+    mainInput.setAttribute('autocapitalize', 'sentences');
+    mainInput.value = '';
+    mainInput.disabled = false;
+    sendBtn.disabled = true;
+    mainInput.oninput = () => {
+      sendBtn.disabled = mainInput.value.trim().length < 1;
+    };
+  }
+
+  // ── Advance ───────────────────────────────────────────────────────────────
+  // Called when user submits the main text input
+  async function advanceText(text) {
+    const step = flow[state.step];
+    if (!step || step.card) return;
+
+    // Clear input and lock it while we process
+    mainInput.value = '';
+    sendBtn.disabled = true;
+    mainInput.disabled = true;
+    addUserMsg(text);
+    requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
+
+    // Validate — if it fails, show friendly bot retry and re-open input
+    if (step.validate && !step.validate(text)) {
+      const errMsg = typeof step.errorMsg === 'function' ? step.errorMsg(text) : step.errorMsg;
+      await addBotMsg(errMsg);
+      mainInput.disabled = false;
+      mainInput.focus();
+      return;
+    }
+
+    step.onSubmit?.(text);
+    if (step.postSubmit) step.postSubmit();
+
+    // Handle push permission
+    if (step.requestPermission) {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        await Notification.requestPermission().catch(() => {});
+      }
+    }
+
+    await runNextStep();
+  }
+
+  // Called when a card (OTP/TC) submits
+  async function advanceFromCard(displayText) {
+    const step = flow[state.step];
+    if (step?.onSubmit) step.onSubmit(displayText);
+    if (step?.postSubmit) step.postSubmit();
+    addUserMsg(displayText);
+    requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
+    await runNextStep();
+  }
+
+  async function runNextStep() {
+    state.step++;
+    if (state.step >= flow.length) return;
+    const next = flow[state.step];
+    const gen = generation;
+
+    setTimeout(async () => {
+      if (generation !== gen) return;
+
+      if (next.gifMsg) {
+        await addGifBubble(next.gifMsg);
+        if (generation !== gen) return;
+      }
+
+      if (next.preBotMsg) {
+        await addBotMsg(typeof next.preBotMsg === 'function' ? next.preBotMsg(state) : next.preBotMsg);
+        if (generation !== gen) return;
+      }
+
+      if (next.botMsg) {
+        await addBotMsg(typeof next.botMsg === 'function' ? next.botMsg(state) : next.botMsg, next.botMsgStyle, next.botMsgBody);
+        if (generation !== gen) return;
+      }
+
+      // If hero message has a follow-up question
+      if (next.followUp) {
+        await addBotMsg(next.followUp);
+        if (generation !== gen) return;
+      }
+
+      setTimeout(() => {
+        if (generation !== gen) return;
+        if (next.card) {
+          renderCard(next);
+        } else {
+          applyStepToInput(next);
+          mainInput.disabled = false;
+          mainInput.focus();
+          requestAnimationFrame(() => updateScrollHint());
+        }
+      }, 150);
+    }, 400);
+  }
+
+  // ── Send button / enter key ───────────────────────────────────────────────
+  sendBtn.addEventListener('click', () => {
+    const v = mainInput.value.trim();
+    if (!v || sendBtn.disabled) return;
+    advanceText(v);
+  });
+  mainInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !sendBtn.disabled) {
+      e.preventDefault();
+      advanceText(mainInput.value.trim());
+    }
+  });
+
+  // ── Scroll hint ───────────────────────────────────────────────────────────
+  function getLastBotBubble() {
+    const all = chatScroll.querySelectorAll('.bubble-bot, .bubble-bot-hero');
+    return all.length ? all[all.length - 1] : null;
+  }
+  function updateScrollHint() {
+    const b = getLastBotBubble();
+    if (!b) { scrollHintBtn.classList.remove('visible'); return; }
+    const bBottom = b.getBoundingClientRect().bottom;
+    const cBottom = chatScroll.getBoundingClientRect().bottom;
+    scrollHintBtn.classList.toggle('visible', bBottom > cBottom + 8);
+  }
+  chatScroll.addEventListener('scroll', updateScrollHint, { passive: true });
+  scrollHintBtn.addEventListener('click', () => {
+    const b = getLastBotBubble();
+    if (!b) return;
+    chatScroll.scrollTo({ top: b.offsetTop + b.offsetHeight - chatScroll.clientHeight + 24, behavior: 'smooth' });
+  });
+
+  // ── Phone edit sheet ──────────────────────────────────────────────────────
+  const phoneEditBackdrop = document.getElementById('phoneEditBackdrop');
+  const phoneEditSheet    = document.getElementById('phoneEditSheet');
+  const phoneEditInput    = document.getElementById('phoneEditInput');
+  const phoneEditSave     = document.getElementById('phoneEditSave');
+
+  function openPhoneEdit() {
+    phoneEditInput.value = formatPhone(state.phone);
+    phoneEditSave.disabled = true;
+    phoneEditBackdrop.classList.add('visible');
+    phoneEditSheet.classList.add('visible');
+    setTimeout(() => phoneEditInput.focus(), 300);
+  }
+  function closePhoneEdit() {
+    phoneEditBackdrop.classList.remove('visible');
+    phoneEditSheet.classList.remove('visible');
+    phoneEditInput.blur();
+  }
+  phoneEditInput.addEventListener('input', () => {
+    const v = phoneEditInput.value.trim();
+    phoneEditSave.disabled = v.replace(/\D/g,'').length < 10 || v.replace(/\D/g,'') === state.phone;
+  });
+  document.getElementById('phoneEditClose').addEventListener('click', closePhoneEdit);
+  phoneEditBackdrop.addEventListener('click', closePhoneEdit);
+  phoneEditSave.addEventListener('click', async () => {
+    const newPhone = phoneEditInput.value.replace(/\D/g,'').slice(0,10);
+    state.phone = newPhone;
+    if (phoneBubbleEl) {
+      const bubble = phoneBubbleEl.classList.contains('bubble-user') ? phoneBubbleEl
+        : phoneBubbleEl.querySelector('.bubble-user');
+      if (bubble) bubble.textContent = formatPhone(newPhone);
+    }
+    closePhoneEdit();
+    const gen = ++generation;
+    state.step = flow.findIndex(s => s.card === 'otp' && s.otpType === 'phone');
+    const otpStep = flow[state.step];
+    activeCard.innerHTML = '';
+    const el = await addBotMsg("I just texted a new code to " + formatPhone(newPhone) + ". Enter it below.");
+    if (generation !== gen) return;
+    renderOtpCard(otpStep);
+    requestAnimationFrame(() => updateScrollHint());
+  });
+
+  // ── Email edit sheet ──────────────────────────────────────────────────────
+  const emailEditBackdrop = document.getElementById('emailEditBackdrop');
+  const emailEditSheet    = document.getElementById('emailEditSheet');
+  const emailEditInput    = document.getElementById('emailEditInput');
+  const emailEditSave     = document.getElementById('emailEditSave');
+
+  function openEmailEdit() {
+    emailEditInput.value = state.email;
+    emailEditSave.disabled = true;
+    emailEditBackdrop.classList.add('visible');
+    emailEditSheet.classList.add('visible');
+    setTimeout(() => emailEditInput.focus(), 300);
+  }
+  function closeEmailEdit() {
+    emailEditBackdrop.classList.remove('visible');
+    emailEditSheet.classList.remove('visible');
+    emailEditInput.blur();
+  }
+  emailEditInput.addEventListener('input', () => {
+    const v = emailEditInput.value.trim();
+    emailEditSave.disabled = v.length < 3 || v === state.email;
+  });
+  document.getElementById('emailEditClose').addEventListener('click', closeEmailEdit);
+  emailEditBackdrop.addEventListener('click', closeEmailEdit);
+  emailEditSave.addEventListener('click', async () => {
+    state.email = emailEditInput.value.trim();
+    if (emailBubbleEl) {
+      const bubble = emailBubbleEl.classList.contains('bubble-user') ? emailBubbleEl
+        : emailBubbleEl.querySelector('.bubble-user');
+      if (bubble) bubble.textContent = state.email;
+    }
+    closeEmailEdit();
+    const gen = ++generation;
+    state.step = flow.findIndex(s => s.card === 'otp' && s.otpType === 'email');
+    const otpStep = flow[state.step];
+    activeCard.innerHTML = '';
+    const el = await addBotMsg("Got it! Check your inbox for the verification code I sent to " + state.email + ".");
+    if (generation !== gen) return;
+    renderOtpCard(otpStep);
+    requestAnimationFrame(() => updateScrollHint());
+  });
+
+  // ── Disclosures sheet ─────────────────────────────────────────────────────
+  const sheetBackdrop     = document.getElementById('sheetBackdrop');
+  const disclosuresSheet  = document.getElementById('disclosuresSheet');
+  const disclosuresTitle  = document.getElementById('disclosuresTitle');
+  const disclosuresBody   = document.getElementById('disclosuresBody');
+
+  function openDisclosures(title, body) {
+    disclosuresTitle.textContent = title;
+    disclosuresBody.innerHTML = body;
+    sheetBackdrop.classList.add('visible');
+    disclosuresSheet.classList.add('visible');
+  }
+  function closeDisclosures() {
+    sheetBackdrop.classList.remove('visible');
+    disclosuresSheet.classList.remove('visible');
+  }
+  document.getElementById('sheetClose').addEventListener('click', closeDisclosures);
+  sheetBackdrop.addEventListener('click', closeDisclosures);
+
+  // Intercept [disclosures](#disclosures) links in chat
+  chatScroll.addEventListener('click', e => {
+    const link = e.target.closest('a');
+    if (link && link.getAttribute('href') === '#disclosures') {
+      e.preventDefault();
+      openDisclosures('Disclosures', `<p>EarnIn is a financial technology company, not a bank. Banking services are provided by our bank partners on certain products other than Cash Out.</p>
+<p>EarnIn does not charge interest on Cash Outs or mandatory fees for standard transfers, which usually take 1–2 business days. For faster transfers, you can choose the Lightning Speed option and pay a fee to receive funds within 30 minutes.</p>
+<p>Tips are optional and do not affect the quality or availability of services. See the <a href="#">Cash Out User Agreement</a> for full details and eligibility requirements.</p>`);
+    }
+  });
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  async function boot() {
+    const gen = generation;
+    const first = flow[0];
+
+    await addBotMsg(first.botMsg, first.botMsgStyle, first.botMsgBody);
+    if (generation !== gen) return;
+
+    setTimeout(() => {
+      if (generation !== gen) return;
+      if (first.card) {
+        renderCard(first);
+      } else {
+        applyStepToInput(first);
+        mainInput.disabled = false;
+        mainInput.focus();
+      }
+      requestAnimationFrame(() => updateScrollHint());
+    }, 150);
+  }
+
+  function restart() {
+    generation++;
+    Object.assign(state, { step: 0, name: '', dob: '', phone: '', email: '' });
+    lastUserBubble = null;
+    phoneBubbleEl = null;
+    emailBubbleEl = null;
+    document.getElementById('successOverlay')?.remove();
+    chatScroll.innerHTML = '';
+    activeCard.innerHTML = '';
+    mainInputCard.style.display = '';
+    mainInput.disabled = false;
+    mainInput.value = '';
+    sendBtn.disabled = true;
+    chatScroll.scrollTop = 0;
+    mainInput.blur();
+    boot();
+  }
+
+  document.getElementById('restartBtn').addEventListener('click', restart);
+
+  // Prevent WKWebView bounce scroll
+  window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
+
+  boot();
+</script>
+</body>
+</html>
