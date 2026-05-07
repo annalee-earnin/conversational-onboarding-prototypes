@@ -188,6 +188,25 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ── OTP input mode (mainInputCard when OTP is active) ── */
+    .text-input-card.otp-mode {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px 16px;
+      justify-content: center;
+    }
+    .text-input-card.otp-mode input {
+      font-size: 28px; font-weight: 700; line-height: 36px;
+      letter-spacing: 6px;
+      text-align: center;
+      color: #111;
+    }
+    .text-input-card.otp-mode input::placeholder {
+      font-size: 16px; font-weight: 400; letter-spacing: 0;
+      color: #aaa;
+    }
+    .text-input-card.otp-mode .send-btn { display: none; }
+
     /* ── OTP card ── */
     .otp-title { font-size: 17px; font-weight: 700; color: #111; }
     .otp-boxes { display: flex; justify-content: space-between; gap: 8px; }
@@ -815,9 +834,10 @@
     // numeric in maybePreSwitchOtpInput (called inside the send-button gesture).
     // Just configure the visible state here.
     mainInput.value = '';
-    mainInput.placeholder = 'Enter 4-digit code';
+    mainInput.placeholder = '––––';
     mainInput.disabled = false;
     mainInputCard.style.display = '';
+    mainInputCard.classList.add('otp-mode');
 
     // Restore handler on input — clear in advanceText
     mainInput.oninput = () => {
@@ -896,6 +916,7 @@
       mainInput.value = '';
       mainInput.oninput = null;
       sendBtn.disabled = true;
+      mainInputCard.classList.remove('otp-mode');
     }
 
     function teardownAndSubmit(code) {
