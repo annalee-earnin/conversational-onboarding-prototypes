@@ -803,7 +803,7 @@
     mainInputCard.style.display = 'none';
     activeCard.innerHTML = '';
 
-    // Ensure nothing is focused when the OTP card appears — the overlay must
+    // Ensure nothing is focused when the OTP card appears — the field must
     // receive focus from the user's own tap, not programmatically.
     // Programmatic focus causes Chrome to dismiss the keyboard on touchend.
     const otpH = document.getElementById('otpHidden');
@@ -811,7 +811,6 @@
     if (document.activeElement && document.activeElement !== document.body) {
       document.activeElement.blur();
     }
-    window._otpKeyboardActive = true; // freeze paddingBottom sync for OTP lifetime
 
     const isPhone = step.otpType === 'phone';
 
@@ -1592,7 +1591,6 @@
     // after focus. Chrome dismisses the keyboard when a focused input's geometry
     // changes — keeping the style identical prevents that.
     otp.style.cssText = 'position:fixed;top:50%;left:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
-    window._otpKeyboardActive = true; // freeze paddingBottom sync while OTP keyboard is active
     otp.focus();
   }
 
@@ -1816,7 +1814,6 @@
     function sync() {
       // Skip all layout changes while the OTP numeric keyboard is active.
       // Any paddingBottom change during OTP can cause Chrome to dismiss the keyboard.
-      if (window._otpKeyboardActive) return;
       const iH  = window.innerHeight;
       const vvH = window.visualViewport ? window.visualViewport.height : iH;
       const vvOT = window.visualViewport ? window.visualViewport.offsetTop : 0;
@@ -1833,15 +1830,14 @@
     window.addEventListener('resize', sync);
 
     // Delayed syncs ensure padding is applied after the keyboard finishes
-    // animating in. Skipped entirely while OTP is active — the _otpKeyboardActive
-    // flag covers both the hidden pre-focus input and the real box inputs.
+    // animating in. Sync runs on ALL focus changes — the OTP field needs to be
+    // pushed above the keyboard, not hidden behind it (Chrome dismisses keyboard
+    // when the focused element is occluded).
     document.addEventListener('focusin', () => {
-      if (window._otpKeyboardActive) return;
       setTimeout(sync, 300);
       setTimeout(sync, 600);
     });
     document.addEventListener('focusout', () => {
-      if (window._otpKeyboardActive) return;
       setTimeout(sync, 300);
     });
 
