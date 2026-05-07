@@ -1808,10 +1808,22 @@
       window.visualViewport.addEventListener('resize', sync);
       window.visualViewport.addEventListener('scroll', sync);
     }
-    // Fallback: window resize fires in many browsers on keyboard show/hide
     window.addEventListener('resize', sync);
-    // Note: focusin/focusout listeners were removed — they called sync() during
-    // the keyboard animation, causing layout shifts that made iOS dismiss the keyboard.
+
+    // Delayed syncs ensure padding is applied after the keyboard finishes
+    // animating in. Skipped when the OTP hidden input is the target — those
+    // intermediate layout changes dismiss the numeric keyboard on iOS.
+    document.addEventListener('focusin', (e) => {
+      const otp = document.getElementById('otpHidden');
+      if (e.target === otp) return;
+      setTimeout(sync, 300);
+      setTimeout(sync, 600);
+    });
+    document.addEventListener('focusout', (e) => {
+      const otp = document.getElementById('otpHidden');
+      if (e.target === otp) return;
+      setTimeout(sync, 300);
+    });
 
     sync();
   })();
