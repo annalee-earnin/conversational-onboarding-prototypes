@@ -811,12 +811,10 @@
 
     const isPhone = step.otpType === 'phone';
 
-    // Reconfigure mainInput for numeric OTP entry
+    // mainInput type/inputmode/autocomplete/maxlength were already switched to
+    // numeric in maybePreSwitchOtpInput (called inside the send-button gesture).
+    // Just configure the visible state here.
     mainInput.value = '';
-    mainInput.type = 'tel';
-    mainInput.setAttribute('inputmode', 'numeric');
-    mainInput.setAttribute('autocomplete', 'one-time-code');
-    mainInput.setAttribute('maxlength', '4');
     mainInput.placeholder = 'Enter 4-digit code';
     mainInput.disabled = false;
     mainInputCard.style.display = '';
@@ -1579,15 +1577,34 @@
     otp.focus();
   }
 
+  // If next step is an OTP card, switch mainInput's type/inputmode to numeric
+  // RIGHT NOW (inside the user-gesture handler). iOS dismisses the keyboard if
+  // the input's type changes outside a user gesture; doing it here lets the
+  // keyboard transition smoothly from text to numeric and stay open through
+  // the bot typing animation into the OTP step.
+  function maybePreSwitchOtpInput(inputValue) {
+    const step = flow[state.step];
+    const nextStep = flow[state.step + 1];
+    if (nextStep?.card !== 'otp') return;
+    if (step.validate && !step.validate(inputValue)) return;
+    mainInput.type = 'tel';
+    mainInput.setAttribute('inputmode', 'numeric');
+    mainInput.setAttribute('autocomplete', 'one-time-code');
+    mainInput.setAttribute('maxlength', '4');
+  }
+
   sendBtn.addEventListener('click', () => {
     const v = mainInput.value.trim();
     if (!v || sendBtn.disabled) return;
+    maybePreSwitchOtpInput(v);
     advanceText(v);
   });
   mainInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !sendBtn.disabled) {
       e.preventDefault();
-      advanceText(mainInput.value.trim());
+      const v = mainInput.value.trim();
+      maybePreSwitchOtpInput(v);
+      advanceText(v);
     }
   });
 
