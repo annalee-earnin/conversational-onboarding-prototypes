@@ -16,9 +16,7 @@
     body { font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif; }
 
     .phone {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 100vh; /* fallback — JS overrides via visualViewport */
+      position: fixed; inset: 0;
       background: #FBEA6B;
       display: flex; flex-direction: column; overflow: hidden;
     }
@@ -1782,15 +1780,22 @@
   window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
 
   // Keep the layout above the soft keyboard (and its toolbar) in browsers.
-  // visualViewport.height reports the fully-visible area, excluding both the
-  // keyboard and the autocomplete/Done toolbar above it.
-  // In WKWebView the viewport is already keyboard-aware, so this is a no-op there.
+  //
+  // Strategy: keep position:fixed;inset:0 so .phone always fills the layout
+  // viewport, then add padding-bottom equal to the keyboard height. Because all
+  // four edges are constrained by inset:0, padding-bottom compresses the flex
+  // content area upward — pushing the input and disclaimer above the keyboard
+  // without any fixed-vs-visual viewport coordinate confusion.
+  //
+  // keyboard height = window.innerHeight − visualViewport.height.
+  // In WKWebView the app resizes the WebView when the keyboard appears, so
+  // innerHeight already equals visualViewport.height → difference = 0 → no change.
   (function syncToVisualViewport() {
     const phone = document.querySelector('.phone');
     if (!window.visualViewport || !phone) return;
     function sync() {
-      phone.style.height = window.visualViewport.height + 'px';
-      phone.style.top    = window.visualViewport.offsetTop + 'px';
+      const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.height);
+      phone.style.paddingBottom = kbHeight + 'px';
     }
     window.visualViewport.addEventListener('resize', sync);
     window.visualViewport.addEventListener('scroll', sync);
