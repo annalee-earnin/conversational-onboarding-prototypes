@@ -812,6 +812,13 @@
       document.activeElement.blur();
     }
 
+    // Pre-emptively reserve space at the bottom of .phone for the keyboard.
+    // .phone has overflow:hidden so iOS can't scroll the focused input above
+    // the keyboard; if the input ends up behind the keyboard, Chrome dismisses
+    // the keyboard. Setting paddingBottom now puts the OTP field high enough
+    // that any keyboard fits below it.
+    document.querySelector('.phone').style.paddingBottom = '340px';
+
     const isPhone = step.otpType === 'phone';
 
     // Pill buttons: Resend + Edit
@@ -858,6 +865,7 @@
       window._otpKeyboardActive = false;
       otpField.blur();
       mainInput.blur();
+      document.querySelector('.phone').style.paddingBottom = '';
       activeCard.innerHTML = '';
       mainInputCard.style.display = '';
       mainInput.disabled = false;
@@ -913,6 +921,7 @@
         setTimeout(() => {
           window._otpKeyboardActive = false;
           otpField.blur();
+          document.querySelector('.phone').style.paddingBottom = '';
           activeCard.innerHTML = '';
           mainInputCard.style.display = '';
           mainInput.disabled = false;
