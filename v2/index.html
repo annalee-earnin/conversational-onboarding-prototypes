@@ -828,7 +828,6 @@
           resendBtn.disabled = true;
           otpOverlay.value = '';
           updateBoxes();
-          otpOverlay.focus();
           const t2 = setInterval(() => {
             countdown--;
             if (countdown > 0) {
@@ -927,12 +926,18 @@
       if (text) { setTimeout(() => { otpOverlay.value = text; updateBoxes(); }, 0); }
     });
 
-    // Focus the overlay — keyboard transfers from otpHidden (pre-focused in
-    // maybePreFocusOtp within the user gesture) to this overlay without dismissing.
-    otpOverlay.focus();
-    // Park the pre-focus helper off-screen
+    // Do NOT call otpOverlay.focus() here.
+    //
+    // Chrome on iOS dismisses the keyboard on touchend when the input was
+    // focused programmatically. The only way the keyboard stays is when the
+    // input gets focus directly from the user's own tap.
+    //
+    // Leaving the overlay unfocused means the user's first tap naturally
+    // establishes focus — Chrome owns that focus, so the keyboard persists.
+    //
+    // Park the pre-focus helper so it doesn't intercept any remaining input
     const otpH = document.getElementById('otpHidden');
-    if (otpH) otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
+    if (otpH) { otpH.blur(); otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;'; }
   }
 
   // ── TC cards ──────────────────────────────────────────────────────────────
