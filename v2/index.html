@@ -798,28 +798,41 @@
     chatScroll.scrollTop = el.offsetTop - 16;
   }
 
-  // ── OTP card (replaces main input with digit boxes) ───────────────────────
+  // ── OTP card — uses mainInput (the same input the user just typed phone
+  // into), reconfigured for numeric entry. We can't get a fresh field's
+  // keyboard to persist in Chrome on iOS, but mainInput's keyboard does
+  // because the user has been interacting with it the whole time.
   function renderOtpCard(step) {
-    mainInputCard.style.display = 'none';
     activeCard.innerHTML = '';
 
-    // Ensure nothing is focused when the OTP card appears — the field must
-    // receive focus from the user's own tap, not programmatically.
-    // Programmatic focus causes Chrome to dismiss the keyboard on touchend.
+    // Park the legacy hidden helper offscreen
     const otpH = document.getElementById('otpHidden');
     if (otpH) { otpH.blur(); otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;'; }
-    if (document.activeElement && document.activeElement !== document.body) {
-      document.activeElement.blur();
-    }
-
-    // Pre-emptively reserve space at the bottom of .phone for the keyboard.
-    // .phone has overflow:hidden so iOS can't scroll the focused input above
-    // the keyboard; if the input ends up behind the keyboard, Chrome dismisses
-    // the keyboard. Setting paddingBottom now puts the OTP field high enough
-    // that any keyboard fits below it.
-    document.querySelector('.phone').style.paddingBottom = '340px';
 
     const isPhone = step.otpType === 'phone';
+
+    // Reconfigure mainInput for numeric OTP entry
+    mainInput.value = '';
+    mainInput.type = 'tel';
+    mainInput.setAttribute('inputmode', 'numeric');
+    mainInput.setAttribute('autocomplete', 'one-time-code');
+    mainInput.setAttribute('maxlength', '4');
+    mainInput.placeholder = 'Enter 4-digit code';
+    mainInput.disabled = false;
+    mainInputCard.style.display = '';
+
+    // Restore handler on input — clear in advanceText
+    mainInput.oninput = () => {
+      const v = mainInput.value.replace(/\D/g, '').slice(0, 4);
+      mainInput.value = v;
+      sendBtn.disabled = v.length < 4;
+      // Auto-submit when 4 digits entered
+      if (v.length >= 4 && !submitted) {
+        submitted = true;
+        clearInterval(timer);
+        teardownAndSubmit(v);
+      }
+    };
 
     // Pill buttons: Resend + Edit
     const pillRow = document.createElement('div');
@@ -842,7 +855,8 @@
           countdown = 30;
           resendBtn.textContent = `Resend code (0:30)`;
           resendBtn.disabled = true;
-          otpField.value = '';
+          mainInput.value = '';
+          sendBtn.disabled = true;
           const t2 = setInterval(() => {
             countdown--;
             if (countdown > 0) {
@@ -862,13 +876,9 @@
     editBtn.textContent = isPhone ? 'Edit phone number' : 'Edit email';
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
-      window._otpKeyboardActive = false;
-      otpField.blur();
+      restoreMainInputDefaults();
       mainInput.blur();
-      document.querySelector('.phone').style.paddingBottom = '';
       activeCard.innerHTML = '';
-      mainInputCard.style.display = '';
-      mainInput.disabled = false;
       if (isPhone) openPhoneEdit();
       else openEmailEdit();
     });
@@ -877,65 +887,28 @@
     pillRow.appendChild(editBtn);
     activeCard.appendChild(pillRow);
 
-    // Single visible <input> — simplest possible OTP field. Styled with
-    // letter-spacing to look like 4 digit positions. No overlays, no per-digit
-    // inputs, no boxes layered on top — just a plain real input element.
-    // The user taps the input, browser shows keyboard, keyboard stays until 4
-    // digits are entered.
-    const otpField = document.createElement('input');
-    otpField.type = 'tel';
-    otpField.setAttribute('inputmode', 'numeric');
-    otpField.setAttribute('autocomplete', 'one-time-code');
-    otpField.maxLength = 4;
-    otpField.placeholder = '• • • •';
-    otpField.style.cssText = [
-      'width:100%',
-      'padding:18px 16px',
-      'font-size:32px',
-      'font-weight:700',
-      'font-family:inherit',
-      'text-align:center',
-      'letter-spacing:18px',
-      'border:2.5px solid #e0e0e0',
-      'border-radius:16px',
-      'background:#fff',
-      'color:#111',
-      'outline:none',
-      'box-sizing:border-box',
-      '-webkit-appearance:none',
-      'appearance:none',
-      'margin-bottom:12px',
-    ].join(';');
-    otpField.addEventListener('focus', () => { otpField.style.borderColor = '#111'; });
-    otpField.addEventListener('blur',  () => { otpField.style.borderColor = '#e0e0e0'; });
-    activeCard.appendChild(otpField);
-
     let submitted = false;
 
-    function checkComplete() {
-      const val = otpField.value.replace(/\D/g, '').slice(0, 4);
-      otpField.value = val;
-      if (val.length >= 4 && !submitted) {
-        submitted = true;
-        clearInterval(timer);
-        setTimeout(() => {
-          window._otpKeyboardActive = false;
-          otpField.blur();
-          document.querySelector('.phone').style.paddingBottom = '';
-          activeCard.innerHTML = '';
-          mainInputCard.style.display = '';
-          mainInput.disabled = false;
-          if (step.onSubmit) step.onSubmit(val);
-          if (step.postSubmit) step.postSubmit();
-          advanceFromCard(`${val[0]} ${val[1]} ${val[2]} ${val[3]}`);
-        }, 300);
-      }
+    function restoreMainInputDefaults() {
+      mainInput.type = 'text';
+      mainInput.removeAttribute('inputmode');
+      mainInput.removeAttribute('autocomplete');
+      mainInput.removeAttribute('maxlength');
+      mainInput.placeholder = 'Reply here';
+      mainInput.value = '';
+      mainInput.oninput = null;
+      sendBtn.disabled = true;
     }
 
-    otpField.addEventListener('input', checkComplete);
-
-    // Do NOT call otpField.focus() — the keyboard must come from user's tap so
-    // Chrome considers the focus user-initiated and keeps the keyboard open.
+    function teardownAndSubmit(code) {
+      setTimeout(() => {
+        restoreMainInputDefaults();
+        activeCard.innerHTML = '';
+        if (step.onSubmit) step.onSubmit(code);
+        if (step.postSubmit) step.postSubmit();
+        advanceFromCard(`${code[0]} ${code[1]} ${code[2]} ${code[3]}`);
+      }, 300);
+    }
   }
 
   // ── TC cards ──────────────────────────────────────────────────────────────
@@ -1570,8 +1543,11 @@
       setTimeout(() => {
         if (generation !== gen) return;
         if (next.card) {
-          // Only blur if mainInput actually has focus — don't disturb OTP pre-focus
-          if (document.activeElement === mainInput) mainInput.blur();
+          // For OTP, keep mainInput focused (we'll reconfigure it for numeric
+          // entry). For all other cards, blur to dismiss the text keyboard.
+          if (next.card !== 'otp' && document.activeElement === mainInput) {
+            mainInput.blur();
+          }
           renderCard(next);
         } else {
           applyStepToInput(next);
