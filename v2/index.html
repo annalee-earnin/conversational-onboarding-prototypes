@@ -615,6 +615,7 @@
     {
       botMsg: "Almost there — just a few quick agreements.\n\nThe first one covers how EarnIn may contact you and confirms you're okay receiving account-related messages by text or email.\n\nDo you agree to EarnIn's [Electronic Communications Agreement](#) and to receive transactional SMS?",
       card: 'quick',
+      requireScrollEnd: true,
       options: [
         { label: 'Learn more', noAdvance: true },
         { label: 'I agree', primary: true, agreeText: 'I agree to the Electronic Communications Agreement and to receive transactional SMS' },
@@ -628,6 +629,7 @@
     {
       botMsg: "This one covers the core rules for using the product and how your data is handled.\n\nDo you agree to EarnIn's [General Terms of Service](#) and [Privacy Documents](#)?",
       card: 'quick',
+      requireScrollEnd: true,
       options: [
         { label: 'Learn more', noAdvance: true },
         { label: 'I agree', primary: true, agreeText: 'I agree to the General Terms of Service and Privacy Documents' },
@@ -849,6 +851,8 @@
     editBtn.textContent = isPhone ? 'Edit phone number' : 'Edit email';
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
+      hiddenInput.blur(); // dismiss numeric keyboard before edit sheet opens
+      mainInput.blur();   // prevent mainInput from being auto-focused on iOS
       hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
       document.body.appendChild(hiddenInput);
       activeCard.innerHTML = '';
@@ -895,6 +899,7 @@
         clearInterval(timer);
         setTimeout(() => {
           const code = hiddenInput.value;
+          hiddenInput.blur(); // prevent numeric keyboard persisting after OTP
           hiddenInput.value = '';
           // Restore hidden input to body (off-screen) before clearing activeCard
           hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
@@ -911,12 +916,10 @@
 
     hiddenInput.addEventListener('input', updateBoxes);
     hiddenInput.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
+    // Tapping anywhere on the boxes row or the card area re-focuses the input
     boxesRow.addEventListener('click', () => hiddenInput.focus());
     boxesRow.addEventListener('touchstart', () => hiddenInput.focus(), { passive: true });
-    // Focus immediately and again after brief delay for WebView compatibility
-    hiddenInput.focus();
-    setTimeout(() => hiddenInput.focus(), 50);
-    setTimeout(() => hiddenInput.focus(), 300);
+    activeCard.addEventListener('touchstart', () => hiddenInput.focus(), { passive: true });
     updateBoxes();
   }
 
@@ -1011,8 +1014,11 @@
   }
 
   function renderQuickReplies(step) {
-    // Hide the text input while QRs are showing
-    mainInputCard.style.display = 'none';
+    // Explicitly set input visibility — hide when requested, show otherwise
+    // (This runs in a non-gesture setTimeout context so iOS won't auto-focus the input)
+    mainInputCard.style.display = step.hideInput ? 'none' : '';
+    // Blur immediately so keyboard is down when card appears
+    mainInput.blur();
     activeCard.innerHTML = '';
     const container = document.createElement('div');
     container.className = 'quick-replies';
@@ -1026,6 +1032,9 @@
       btn.style.cssText = `opacity:0;transform:translateY(6px);transition:opacity 0.18s ease ${idx * 55}ms,transform 0.18s ease ${idx * 55}ms`;
 
       btn.addEventListener('click', async () => {
+        // Blur immediately in the synchronous tap handler — this is the only reliable
+        // way to keep the keyboard closed on iOS WebView when a card button is tapped.
+        mainInput.blur();
         if (opt.noAdvance) {
           // Learn more: show content as bot message, then re-render just "I agree"
           if (step.learnMore?.chatMsg) {
@@ -1045,7 +1054,8 @@
           }
         }
         activeCard.innerHTML = '';
-        mainInputCard.style.display = '';
+        // Do NOT restore mainInputCard here — applyStepToInput or renderCard will do it
+        // in a non-gesture context so iOS doesn't auto-focus the input.
         const displayText = (typeof opt === 'object' && opt.agreeText) ? opt.agreeText : label;
         advanceFromCard(displayText);
       });
@@ -1054,12 +1064,34 @@
 
     activeCard.appendChild(container);
 
-    requestAnimationFrame(() => {
+    const revealBtns = () => {
       container.querySelectorAll('.quick-reply-btn').forEach(btn => {
         btn.style.opacity = '1';
         btn.style.transform = 'translateY(0)';
       });
-    });
+      // Hide the scroll chevron once QRs are revealed
+      updateScrollHint();
+    };
+
+    if (step.requireScrollEnd) {
+      // Reveal QRs only when the bottom of the last bot bubble scrolls into view.
+      // We compare getBoundingClientRect() so the 60vh ::after spacer doesn't interfere.
+      const check = () => {
+        const b = getLastBotBubble();
+        if (!b) return;
+        const bBottom = b.getBoundingClientRect().bottom;
+        const cBottom = chatScroll.getBoundingClientRect().bottom;
+        if (bBottom <= cBottom + 8) {
+          chatScroll.removeEventListener('scroll', check);
+          revealBtns();
+        }
+      };
+      chatScroll.addEventListener('scroll', check);
+      // Also check immediately in case the message already fits on screen
+      setTimeout(check, 300);
+    } else {
+      requestAnimationFrame(revealBtns);
+    }
   }
 
   // ── Attribution card ──────────────────────────────────────────────────────
@@ -1069,7 +1101,7 @@
 
   function _buildAttributionList(isSocialDrill) {
     activeCard.innerHTML = '';
-    mainInput.disabled = true;
+    mainInputCard.style.display = 'none';
 
     const SOURCES = isSocialDrill
       ? ['Facebook / Instagram', 'TikTok', 'Reddit', 'Snapchat']
@@ -1096,7 +1128,7 @@
     const skipBtn = document.createElement('button');
     skipBtn.textContent = 'Skip';
     skipBtn.style.cssText = 'background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);cursor:pointer;padding:4px 0;';
-    skipBtn.addEventListener('click', () => { activeCard.innerHTML = ''; mainInput.disabled = false; advanceFromCard('Skip'); });
+    skipBtn.addEventListener('click', () => { mainInput.blur(); activeCard.innerHTML = ''; advanceFromCard('Skip'); });
     header.appendChild(skipBtn);
     card.appendChild(header);
 
@@ -1108,11 +1140,11 @@
       row.textContent = label;
       row.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid #f0f0f0;padding:14px 16px;font-family:inherit;font-size:16px;color:#111;cursor:pointer;';
       row.addEventListener('click', () => {
+        mainInput.blur();
         if (!isSocialDrill && label === 'Social media') {
           _buildAttributionList(true);
         } else {
           activeCard.innerHTML = '';
-          mainInput.disabled = false;
           advanceFromCard(label);
         }
       });
@@ -1134,8 +1166,8 @@
     const submitOther = () => {
       const v = otherInput.value.trim();
       if (!v) return;
+      mainInput.blur();
       activeCard.innerHTML = '';
-      mainInput.disabled = false;
       advanceFromCard(v);
     };
     otherBtn.addEventListener('click', submitOther);
@@ -1151,40 +1183,66 @@
   // ── Verify info card ────────────────────────────────────────────────────
   function renderVerifyCard() {
     mainInput.disabled = true;
-    // Hide input row so card covers that space
     mainInputCard.style.display = 'none';
     activeCard.innerHTML = '';
 
-    function done() {
-      activeCard.innerHTML = '';
-      mainInputCard.style.display = '';
-      mainInput.disabled = false;
-    }
-
+    // ── helpers ────────────────────────────────────────────────────────────
     function formatDOBDisplay(dob) {
       const months = ['January','February','March','April','May','June',
                       'July','August','September','October','November','December'];
       const m = dob.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
       if (!m) return dob;
-      const mo = parseInt(m[1]) - 1;
-      const d  = parseInt(m[2]);
-      const y  = m[3].length === 2 ? '19' + m[3] : m[3];
-      return `${months[mo]} ${d}, ${y}`;
+      return `${months[parseInt(m[1]) - 1]} ${parseInt(m[2])}, ${m[3].length === 2 ? '19' + m[3] : m[3]}`;
     }
-
-    // Split state.name into first / last
     function splitName(full) {
       const parts = full.trim().split(/\s+/);
       return { first: parts[0] || '', last: parts.slice(1).join(' ') };
     }
-
     function makeLabel(text) {
       const l = document.createElement('div');
       l.style.cssText = 'font-size:11px;font-weight:600;color:rgba(0,0,0,0.4);text-transform:uppercase;letter-spacing:0.6px;';
       l.textContent = text;
       return l;
     }
+    function normalizeDOB(dob) {
+      const m = dob.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (!m) return dob;
+      const y = m[3].length === 2 ? '19' + m[3] : m[3];
+      return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${y}`;
+    }
 
+    function done() {
+      activeCard.innerHTML = '';
+      // Do NOT restore mainInputCard or re-enable mainInput here —
+      // applyStepToInput / renderCard will do it in a non-gesture context.
+    }
+
+    // Appends a read-only summary card into the chat scroll after confirmation
+    function addSummaryCard(name, dob) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cssText = 'gap:14px;border-radius:16px;opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s;animation:none;';
+      const { first, last } = splitName(name);
+      [
+        { label: 'First name',    value: first },
+        { label: 'Last name',     value: last || '—' },
+        { label: 'Date of birth', value: formatDOBDisplay(dob) },
+      ].forEach(({ label, value }) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+        const v = document.createElement('div');
+        v.style.cssText = 'font-size:17px;font-weight:500;color:#111;';
+        v.textContent = value;
+        row.appendChild(makeLabel(label));
+        row.appendChild(v);
+        card.appendChild(row);
+      });
+      chatScroll.appendChild(card);
+      requestAnimationFrame(() => { card.style.opacity = '1'; card.style.transform = 'translateY(0)'; });
+      return card;
+    }
+
+    // ── View mode card (in activeCard) ─────────────────────────────────────
     function buildViewMode() {
       activeCard.innerHTML = '';
       const card = document.createElement('div');
@@ -1223,9 +1281,18 @@
       const confirmBtn = document.createElement('button');
       confirmBtn.textContent = "That's correct";
       confirmBtn.style.cssText = 'padding:10px 20px;border-radius:100px;border:none;background:#000;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;';
-      confirmBtn.addEventListener('click', () => {
+      confirmBtn.addEventListener('click', async () => {
+        mainInput.blur(); // keep keyboard closed — this is a tap, not a text input
         done();
-        advanceFromCard("That's correct");
+        const summaryCard = addSummaryCard(state.name, state.dob);
+        const step = flow[state.step];
+        if (step?.onSubmit) step.onSubmit("That's correct");
+        addUserMsg("That's correct");
+        // Scroll AFTER both card and user bubble are in the DOM
+        requestAnimationFrame(() => {
+          chatScroll.scrollTop = summaryCard.offsetTop - 16;
+        });
+        await runNextStep();
       });
 
       ctaRow.appendChild(editBtn);
@@ -1234,6 +1301,7 @@
       activeCard.appendChild(card);
     }
 
+    // ── Edit mode card (in activeCard) ─────────────────────────────────────
     function buildEditMode() {
       activeCard.innerHTML = '';
       const card = document.createElement('div');
@@ -1254,19 +1322,11 @@
         return { wrap, inp };
       }
 
-      function normalizeDOB(dob) {
-        const m = dob.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-        if (!m) return dob;
-        const y = m[3].length === 2 ? '19' + m[3] : m[3];
-        return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${y}`;
-      }
-
       const { first, last } = splitName(state.name);
       const { wrap: firstWrap, inp: firstInp } = makeField('First name', first, 'First name', null);
       const { wrap: lastWrap,  inp: lastInp  } = makeField('Last name',  last,  'Last name',  null);
       const { wrap: dobWrap,   inp: dobInp   } = makeField('Date of birth', normalizeDOB(state.dob), 'MM/DD/YYYY', 'numeric');
 
-      // Format hint below DOB
       const dobHint = document.createElement('div');
       dobHint.style.cssText = 'font-size:12px;color:rgba(0,0,0,0.4);margin-top:-4px;';
       dobHint.textContent = 'MM/DD/YYYY';
@@ -1277,7 +1337,6 @@
       dobError.textContent = 'Please enter a valid date. You must be at least 18.';
       dobWrap.appendChild(dobError);
 
-      // Auto-format DOB as user types — skip reformatting on deletion
       let prevDobLen = dobInp.value.length;
       dobInp.addEventListener('input', () => {
         const currentLen = dobInp.value.length;
@@ -1299,6 +1358,7 @@
       saveBtn.style.cssText = 'width:100%;padding:14px;border-radius:100px;border:none;background:#000;color:#fff;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;';
 
       saveBtn.addEventListener('click', async () => {
+        mainInput.blur(); // keep keyboard closed — user tapped Save, not the text input
         const newFirst = firstInp.value.trim();
         const newLast  = lastInp.value.trim();
         const newName  = [newFirst, newLast].filter(Boolean).join(' ');
@@ -1311,8 +1371,12 @@
         state.name = newName;
         state.dob  = newDob;
         done();
-        addUserMsg(`${newName} · ${formatDOBDisplay(newDob)}`);
-        requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
+        const summaryCard = addSummaryCard(newName, newDob);
+        addUserMsg("I updated it");
+        // Scroll AFTER both card and user bubble are in the DOM
+        requestAnimationFrame(() => {
+          chatScroll.scrollTop = summaryCard.offsetTop - 16;
+        });
         const gen = generation;
         await addBotMsg("Got it — I've updated your info!");
         if (generation !== gen) return;
@@ -1381,7 +1445,11 @@
       case 'continue':    renderContinueCard();        break;
       case 'done':        renderDoneCard();           break;
     }
+    // Call twice: rAF catches most cases; the setTimeout catches cases where
+    // inserting card content changes the chatScroll height (e.g. QR buttons
+    // shrinking chatScroll so a long T&C message now overflows).
     requestAnimationFrame(() => updateScrollHint());
+    setTimeout(() => updateScrollHint(), 200);
   }
 
   // ── Input setup ───────────────────────────────────────────────────────────
@@ -1405,19 +1473,22 @@
     const step = flow[state.step];
     if (!step || step.card) return;
 
-    // Clear input and lock it while we process
+    // Clear input and lock the send button — but keep the input enabled so
+    // the keyboard stays up on iOS (disabled elements lose focus and dismiss keyboard).
+    // Clearing oninput prevents the send button from being re-enabled by typing.
     mainInput.value = '';
+    mainInput.oninput = null;
     sendBtn.disabled = true;
-    mainInput.disabled = true;
     addUserMsg(text);
     requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
 
-    // Validate — if it fails, show friendly bot retry and re-open input
+    // Validate — if it fails, show friendly bot retry and re-arm input
     if (step.validate && !step.validate(text)) {
       const errMsg = typeof step.errorMsg === 'function' ? step.errorMsg(text) : step.errorMsg;
       await addBotMsg(errMsg);
-      mainInput.disabled = false;
       mainInput.focus();
+      // Re-arm oninput so the send button works again
+      mainInput.oninput = () => { sendBtn.disabled = mainInput.value.trim().length < 1; };
       return;
     }
 
@@ -1434,7 +1505,7 @@
     await runNextStep();
   }
 
-  // Called when a card (OTP/TC) submits
+  // Called when a card (OTP/TC/QR) submits
   async function advanceFromCard(displayText) {
     const step = flow[state.step];
     if (step?.onSubmit) step.onSubmit(displayText);
@@ -1477,11 +1548,10 @@
       setTimeout(() => {
         if (generation !== gen) return;
         if (next.card) {
+          mainInput.blur(); // dismiss keyboard — card steps don't use the text input
           renderCard(next);
         } else {
           applyStepToInput(next);
-          mainInput.disabled = false;
-          mainInput.focus();
           requestAnimationFrame(() => updateScrollHint());
         }
       }, 150);
@@ -1489,6 +1559,25 @@
   }
 
   // ── Send button / enter key ───────────────────────────────────────────────
+  // If the step that follows will show an OTP card, pre-focus the hidden OTP
+  // input RIGHT NOW while we're still inside the user-gesture handler.
+  // iOS WebView won't open the keyboard for programmatic focus called later
+  // (inside setTimeout/async), but it will honour a focus() called here.
+  function maybePreFocusOtp(inputValue) {
+    const step = flow[state.step];
+    const nextStep = flow[state.step + 1];
+    if (nextStep?.card !== 'otp') return;
+    // Only pre-focus if validation would pass (otherwise flow won't advance to OTP)
+    if (step.validate && !step.validate(inputValue)) return;
+    const otp = document.getElementById('otpHidden');
+    otp.readOnly = false;
+    otp.setAttribute('inputmode', 'numeric');
+    otp.setAttribute('type', 'tel');
+    // Place it in-viewport so iOS treats it as a real focusable target
+    otp.style.cssText = 'position:fixed;bottom:50px;left:50%;transform:translateX(-50%);width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+    otp.focus();
+  }
+
   sendBtn.addEventListener('click', () => {
     const v = mainInput.value.trim();
     if (!v || sendBtn.disabled) return;
