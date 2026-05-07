@@ -819,15 +819,24 @@
   function renderOtpCard(step) {
     activeCard.innerHTML = '';
 
+    // Capture the bot bubble shown just before this OTP card — needed so
+    // the edit-save handler can remove the stale intro message.
+    const otpIntroMsg = getLastBotBubble();
+
     // Park the legacy hidden helper offscreen
     const otpH = document.getElementById('otpHidden');
     if (otpH) { otpH.blur(); otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;'; }
 
     const isPhone = step.otpType === 'phone';
 
-    // mainInput type/inputmode/autocomplete/maxlength were already switched to
-    // numeric in maybePreSwitchOtpInput (called inside the send-button gesture).
-    // Just configure the visible state here.
+    // Always (re-)apply numeric keyboard attributes here. maybePreSwitchOtpInput
+    // does this inside the send-gesture for the first OTP render, but re-renders
+    // triggered by edit-save run after an await outside any gesture, so we must
+    // set them explicitly every time.
+    mainInput.type = 'tel';
+    mainInput.setAttribute('inputmode', 'numeric');
+    mainInput.setAttribute('autocomplete', 'one-time-code');
+    mainInput.setAttribute('maxlength', '4');
     mainInput.value = '';
     mainInput.placeholder = '';
     mainInput.disabled = false;
@@ -877,11 +886,122 @@
     editBtn.textContent = isPhone ? 'Edit phone number' : 'Edit email';
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
-      restoreMainInputDefaults();
-      mainInput.blur();
+
+      // Build inline edit card directly in activeCard
       activeCard.innerHTML = '';
-      if (isPhone) openPhoneEdit();
-      else openEmailEdit();
+
+      const eCard = document.createElement('div');
+      eCard.className = 'card';
+
+      // Header: title + X button
+      const eHeader = document.createElement('div');
+      eHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;';
+      const eTitle = document.createElement('span');
+      eTitle.style.cssText = 'font-size:15px;font-weight:700;color:#111;';
+      eTitle.textContent = isPhone ? 'Edit phone number' : 'Edit email';
+      const eClose = document.createElement('button');
+      eClose.innerHTML = '&#x2715;';
+      eClose.style.cssText = 'background:none;border:none;font-size:16px;cursor:pointer;padding:4px 4px 4px 8px;color:#666;line-height:1;';
+      eHeader.appendChild(eTitle);
+      eHeader.appendChild(eClose);
+      eCard.appendChild(eHeader);
+
+      // Input field
+      const eInp = document.createElement('input');
+      eInp.style.cssText = 'width:100%;border:none;outline:none;background:#f0f0f5;border-radius:8px;padding:12px 14px;font-size:16px;font-family:inherit;box-sizing:border-box;';
+      if (isPhone) {
+        eInp.type = 'tel';
+        eInp.setAttribute('inputmode', 'tel');
+        eInp.value = formatPhone(state.phone);
+      } else {
+        eInp.type = 'email';
+        eInp.setAttribute('inputmode', 'email');
+        eInp.setAttribute('autocapitalize', 'none');
+        eInp.setAttribute('autocorrect', 'off');
+        eInp.value = state.email;
+      }
+      eCard.appendChild(eInp);
+
+      // Save button
+      const eSave = document.createElement('button');
+      eSave.style.cssText = 'width:100%;background:#000;color:#fff;border:none;border-radius:999px;padding:14px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;opacity:0.25;';
+      eSave.textContent = 'Save';
+      eSave.disabled = true;
+      eCard.appendChild(eSave);
+
+      // Also keep mainInput hidden (otp-mode) so switching to eInp keeps keyboard alive
+      activeCard.appendChild(eCard);
+
+      // Focus synchronously within the click gesture — keeps keyboard alive on iOS
+      eInp.focus();
+
+      // Enable Save when value is valid and different
+      eInp.addEventListener('input', () => {
+        let valid = false;
+        if (isPhone) {
+          const d = eInp.value.replace(/\D/g, '');
+          valid = d.length >= 10 && d !== state.phone;
+        } else {
+          const v = eInp.value.trim();
+          valid = v.length >= 3 && v !== state.email;
+        }
+        eSave.disabled = !valid;
+        eSave.style.opacity = valid ? '1' : '0.25';
+      });
+
+      // X: restore OTP card
+      eClose.addEventListener('click', () => {
+        // Re-configure mainInput for OTP and re-render card
+        mainInput.type = 'tel';
+        mainInput.setAttribute('inputmode', 'numeric');
+        mainInput.setAttribute('autocomplete', 'one-time-code');
+        mainInput.setAttribute('maxlength', '4');
+        mainInput.value = '';
+        mainInput.placeholder = '';
+        renderOtpCard(step);
+        mainInput.focus();
+      });
+
+      // Save: update state, send new bot message, re-render OTP
+      eSave.addEventListener('click', async () => {
+        const gen = ++generation;
+        // Restore mainInput to a neutral state before async work
+        restoreMainInputDefaults();
+        mainInputCard.classList.remove('otp-mode');
+        activeCard.innerHTML = '';
+
+        // Remove the original OTP intro message so it doesn't linger
+        if (otpIntroMsg && otpIntroMsg.parentNode) otpIntroMsg.remove();
+
+        if (isPhone) {
+          const newPhone = eInp.value.replace(/\D/g, '').slice(0, 10);
+          state.phone = newPhone;
+          if (phoneBubbleEl) {
+            const bubble = phoneBubbleEl.classList.contains('bubble-user') ? phoneBubbleEl
+              : phoneBubbleEl.querySelector('.bubble-user');
+            if (bubble) bubble.textContent = formatPhone(newPhone);
+          }
+          state.step = flow.findIndex(s => s.card === 'otp' && s.otpType === 'phone');
+          const nextOtpStep = flow[state.step];
+          await addBotMsg('I just texted a new code to ' + formatPhone(newPhone) + '. Enter it below.');
+          if (generation !== gen) return;
+          renderOtpCard(nextOtpStep);
+        } else {
+          const newEmail = eInp.value.trim();
+          state.email = newEmail;
+          if (emailBubbleEl) {
+            const bubble = emailBubbleEl.classList.contains('bubble-user') ? emailBubbleEl
+              : emailBubbleEl.querySelector('.bubble-user');
+            if (bubble) bubble.textContent = newEmail;
+          }
+          state.step = flow.findIndex(s => s.card === 'otp' && s.otpType === 'email');
+          const nextOtpStep = flow[state.step];
+          await addBotMsg('Got it! Check your inbox for the verification code I sent to ' + newEmail + '.');
+          if (generation !== gen) return;
+          renderOtpCard(nextOtpStep);
+        }
+        setTimeout(() => { scrollToLastMsg(); updateScrollHint(); }, 100);
+      });
     });
 
     pillRow.appendChild(resendBtn);
