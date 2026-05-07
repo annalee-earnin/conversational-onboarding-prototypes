@@ -836,8 +836,7 @@
           countdown = 30;
           resendBtn.textContent = `Resend code (0:30)`;
           resendBtn.disabled = true;
-          otpOverlay.value = '';
-          updateBoxes();
+          otpField.value = '';
           const t2 = setInterval(() => {
             countdown--;
             if (countdown > 0) {
@@ -858,7 +857,7 @@
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
       window._otpKeyboardActive = false;
-      otpOverlay.blur();
+      otpField.blur();
       mainInput.blur();
       activeCard.innerHTML = '';
       mainInputCard.style.display = '';
@@ -871,55 +870,50 @@
     pillRow.appendChild(editBtn);
     activeCard.appendChild(pillRow);
 
-    // Visual digit boxes (display-only divs) + a single transparent <input>
-    // overlay that physically covers the whole row.
-    //
-    // Why overlay: Chrome on iOS dismisses the keyboard when a touch ENDS on a
-    // non-input element. Making the boxes real <input> elements per-digit didn't
-    // help because Chrome still treated the inter-digit spaces as non-input. The
-    // overlay fills the entire hit area so every tap — start AND end — lands on
-    // a real <input>. Browser keeps keyboard open natively; no JS tricks needed.
-    const boxesRow = document.createElement('div');
-    boxesRow.className = 'otp-input-boxes';
-    boxesRow.style.position = 'relative';
-
-    const boxEls = [0,1,2,3].map(i => {
-      const box = document.createElement('div');
-      box.className = 'otp-input-box' + (i === 0 ? ' active' : '');
-      box.style.pointerEvents = 'none'; // taps fall through to the overlay
-      boxesRow.appendChild(box);
-      return box;
-    });
-
-    // The overlay input — invisible but covers every tap on the box row
-    const otpOverlay = document.createElement('input');
-    otpOverlay.type = 'tel';
-    otpOverlay.setAttribute('inputmode', 'numeric');
-    otpOverlay.setAttribute('autocomplete', 'one-time-code');
-    otpOverlay.maxLength = 4;
-    // Note: NO opacity property — Chrome on iOS treats opacity<1 inputs as
-    // non-interactive for keyboard-persistence purposes. Use transparent
-    // background/color/caret instead to make it visually invisible.
-    otpOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;padding:0;margin:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;z-index:2;';
-    boxesRow.appendChild(otpOverlay);
-    activeCard.appendChild(boxesRow);
+    // Single visible <input> — simplest possible OTP field. Styled with
+    // letter-spacing to look like 4 digit positions. No overlays, no per-digit
+    // inputs, no boxes layered on top — just a plain real input element.
+    // The user taps the input, browser shows keyboard, keyboard stays until 4
+    // digits are entered.
+    const otpField = document.createElement('input');
+    otpField.type = 'tel';
+    otpField.setAttribute('inputmode', 'numeric');
+    otpField.setAttribute('autocomplete', 'one-time-code');
+    otpField.maxLength = 4;
+    otpField.placeholder = '• • • •';
+    otpField.style.cssText = [
+      'width:100%',
+      'padding:18px 16px',
+      'font-size:32px',
+      'font-weight:700',
+      'font-family:inherit',
+      'text-align:center',
+      'letter-spacing:18px',
+      'border:2.5px solid #e0e0e0',
+      'border-radius:16px',
+      'background:#fff',
+      'color:#111',
+      'outline:none',
+      'box-sizing:border-box',
+      '-webkit-appearance:none',
+      'appearance:none',
+      'margin-bottom:12px',
+    ].join(';');
+    otpField.addEventListener('focus', () => { otpField.style.borderColor = '#111'; });
+    otpField.addEventListener('blur',  () => { otpField.style.borderColor = '#e0e0e0'; });
+    activeCard.appendChild(otpField);
 
     let submitted = false;
 
-    function updateBoxes() {
-      const val = otpOverlay.value.replace(/\D/g, '').slice(0, 4);
-      otpOverlay.value = val;
-      boxEls.forEach((box, i) => {
-        box.textContent = val[i] || '';
-        box.classList.toggle('filled', !!val[i]);
-        box.classList.toggle('active', i === val.length && val.length < 4);
-      });
+    function checkComplete() {
+      const val = otpField.value.replace(/\D/g, '').slice(0, 4);
+      otpField.value = val;
       if (val.length >= 4 && !submitted) {
         submitted = true;
         clearInterval(timer);
         setTimeout(() => {
           window._otpKeyboardActive = false;
-          otpOverlay.blur();
+          otpField.blur();
           activeCard.innerHTML = '';
           mainInputCard.style.display = '';
           mainInput.disabled = false;
@@ -930,16 +924,10 @@
       }
     }
 
-    otpOverlay.addEventListener('input', updateBoxes);
-    otpOverlay.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
+    otpField.addEventListener('input', checkComplete);
 
-    // SMS / clipboard paste — strip non-digits and fill
-    otpOverlay.addEventListener('paste', e => {
-      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 4);
-      if (text) { setTimeout(() => { otpOverlay.value = text; updateBoxes(); }, 0); }
-    });
-
-    // Do NOT call otpOverlay.focus() — keyboard must come from user's own tap.
+    // Do NOT call otpField.focus() — the keyboard must come from user's tap so
+    // Chrome considers the focus user-initiated and keeps the keyboard open.
   }
 
   // ── TC cards ──────────────────────────────────────────────────────────────
