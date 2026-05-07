@@ -188,24 +188,18 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── OTP input mode (mainInputCard when OTP is active) ── */
+    /* ── OTP input mode: hide mainInputCard visually, keep input in DOM so
+          the keyboard stays alive. opacity:0 + height:1px + overflow:hidden
+          means the element exists but renders nothing. ── */
     .text-input-card.otp-mode {
-      background: #fff;
-      border-radius: 16px;
-      padding: 14px 16px;
-      justify-content: center;
+      opacity: 0;
+      height: 1px;
+      min-height: 0;
+      overflow: hidden;
+      padding: 0;
+      margin: 0;
+      pointer-events: none;
     }
-    .text-input-card.otp-mode input {
-      font-size: 28px; font-weight: 700; line-height: 36px;
-      letter-spacing: 6px;
-      text-align: center;
-      color: #111;
-    }
-    .text-input-card.otp-mode input::placeholder {
-      font-size: 16px; font-weight: 400; letter-spacing: 0;
-      color: #aaa;
-    }
-    .text-input-card.otp-mode .send-btn { display: none; }
 
     /* ── OTP card ── */
     .otp-title { font-size: 17px; font-weight: 700; color: #111; }
@@ -834,16 +828,41 @@
     // numeric in maybePreSwitchOtpInput (called inside the send-button gesture).
     // Just configure the visible state here.
     mainInput.value = '';
-    mainInput.placeholder = '––––';
+    mainInput.placeholder = '';
     mainInput.disabled = false;
     mainInputCard.style.display = '';
     mainInputCard.classList.add('otp-mode');
+
+    // ── Visual digit boxes ──
+    const boxWrap = document.createElement('div');
+    boxWrap.className = 'card';
+    boxWrap.style.cssText = 'padding:20px 16px;';
+    const boxRow = document.createElement('div');
+    boxRow.className = 'otp-boxes';
+    const boxes = [0,1,2,3].map(() => {
+      const b = document.createElement('div');
+      b.className = 'otp-box';
+      boxRow.appendChild(b);
+      return b;
+    });
+    boxWrap.appendChild(boxRow);
+    activeCard.appendChild(boxWrap);
+
+    function updateBoxes(v) {
+      boxes.forEach((b, i) => {
+        b.textContent = v[i] || '';
+        b.classList.toggle('filled', i < v.length);
+        b.classList.toggle('active', i === v.length && v.length < 4);
+      });
+    }
+    updateBoxes('');
 
     // Restore handler on input — clear in advanceText
     mainInput.oninput = () => {
       const v = mainInput.value.replace(/\D/g, '').slice(0, 4);
       mainInput.value = v;
       sendBtn.disabled = v.length < 4;
+      updateBoxes(v);
       // Auto-submit when 4 digits entered
       if (v.length >= 4 && !submitted) {
         submitted = true;
@@ -875,6 +894,7 @@
           resendBtn.disabled = true;
           mainInput.value = '';
           sendBtn.disabled = true;
+          updateBoxes('');
           const t2 = setInterval(() => {
             countdown--;
             if (countdown > 0) {
