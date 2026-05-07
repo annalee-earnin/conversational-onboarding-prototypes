@@ -1679,7 +1679,14 @@
     container.className = 'quick-replies';
     container.style.padding = '0 0 24px';
 
-    step.options.forEach((opt, idx) => {
+    // Always render primary (filled) button last so it sits at the bottom
+    const sortedOptions = [...step.options].sort((a, b) => {
+      const aP = typeof a === 'object' && a.primary ? 1 : 0;
+      const bP = typeof b === 'object' && b.primary ? 1 : 0;
+      return aP - bP;
+    });
+
+    sortedOptions.forEach((opt, idx) => {
       const label = typeof opt === 'string' ? opt : opt.label;
       const primary = typeof opt === 'object' && opt.primary;
       const btn = document.createElement('button');
