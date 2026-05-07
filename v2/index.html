@@ -897,7 +897,10 @@
     otpOverlay.setAttribute('inputmode', 'numeric');
     otpOverlay.setAttribute('autocomplete', 'one-time-code');
     otpOverlay.maxLength = 4;
-    otpOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;padding:0;margin:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;';
+    // Note: NO opacity property — Chrome on iOS treats opacity<1 inputs as
+    // non-interactive for keyboard-persistence purposes. Use transparent
+    // background/color/caret instead to make it visually invisible.
+    otpOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;padding:0;margin:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;z-index:2;';
     boxesRow.appendChild(otpOverlay);
     activeCard.appendChild(boxesRow);
 
