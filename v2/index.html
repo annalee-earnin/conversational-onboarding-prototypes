@@ -833,45 +833,7 @@
     mainInputCard.style.display = '';
     mainInputCard.classList.add('otp-mode');
 
-    // ── Visual digit boxes ──
-    const boxWrap = document.createElement('div');
-    boxWrap.className = 'card';
-    boxWrap.style.cssText = 'padding:20px 16px;';
-    const boxRow = document.createElement('div');
-    boxRow.className = 'otp-boxes';
-    const boxes = [0,1,2,3].map(() => {
-      const b = document.createElement('div');
-      b.className = 'otp-box';
-      boxRow.appendChild(b);
-      return b;
-    });
-    boxWrap.appendChild(boxRow);
-    activeCard.appendChild(boxWrap);
-
-    function updateBoxes(v) {
-      boxes.forEach((b, i) => {
-        b.textContent = v[i] || '';
-        b.classList.toggle('filled', i < v.length);
-        b.classList.toggle('active', i === v.length && v.length < 4);
-      });
-    }
-    updateBoxes('');
-
-    // Restore handler on input — clear in advanceText
-    mainInput.oninput = () => {
-      const v = mainInput.value.replace(/\D/g, '').slice(0, 4);
-      mainInput.value = v;
-      sendBtn.disabled = v.length < 4;
-      updateBoxes(v);
-      // Auto-submit when 4 digits entered
-      if (v.length >= 4 && !submitted) {
-        submitted = true;
-        clearInterval(timer);
-        teardownAndSubmit(v);
-      }
-    };
-
-    // Pill buttons: Resend + Edit
+    // Pill buttons: Resend + Edit (rendered FIRST so they appear above boxes)
     const pillRow = document.createElement('div');
     pillRow.className = 'otp-pill-row';
 
@@ -924,6 +886,46 @@
     pillRow.appendChild(resendBtn);
     pillRow.appendChild(editBtn);
     activeCard.appendChild(pillRow);
+
+    // ── Visual digit boxes (below pills) ──
+    const boxRow = document.createElement('div');
+    boxRow.className = 'otp-boxes';
+    const boxes = [0,1,2,3].map(() => {
+      const b = document.createElement('div');
+      b.className = 'otp-box';
+      boxRow.appendChild(b);
+      return b;
+    });
+    activeCard.appendChild(boxRow);
+
+    function updateBoxes(v) {
+      boxes.forEach((b, i) => {
+        b.textContent = v[i] || '';
+        b.classList.toggle('filled', i < v.length);
+        b.classList.toggle('active', i === v.length && v.length < 4);
+      });
+    }
+    updateBoxes('');
+
+    // Tapping any box re-focuses mainInput (brings keyboard up)
+    boxRow.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      mainInput.focus();
+    }, { passive: false });
+    boxRow.addEventListener('click', () => mainInput.focus());
+
+    // Restore oninput handler
+    mainInput.oninput = () => {
+      const v = mainInput.value.replace(/\D/g, '').slice(0, 4);
+      mainInput.value = v;
+      sendBtn.disabled = v.length < 4;
+      updateBoxes(v);
+      if (v.length >= 4 && !submitted) {
+        submitted = true;
+        clearInterval(timer);
+        teardownAndSubmit(v);
+      }
+    };
 
     let submitted = false;
 
