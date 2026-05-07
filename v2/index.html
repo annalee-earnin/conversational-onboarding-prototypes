@@ -970,8 +970,14 @@
         mainInputCard.classList.remove('otp-mode');
         activeCard.innerHTML = '';
 
-        // Remove the original OTP intro message so it doesn't linger
-        if (otpIntroMsg && otpIntroMsg.parentNode) otpIntroMsg.remove();
+        // Remove the original OTP intro message so it doesn't linger, then
+        // immediately snap scroll to the anchor bubble so the removal doesn't
+        // cause a visible scroll-up before we scroll back down.
+        if (otpIntroMsg && otpIntroMsg.parentNode) {
+          otpIntroMsg.remove();
+          const anchor = isPhone ? phoneBubbleEl : emailBubbleEl;
+          if (anchor) chatScroll.scrollTop = Math.max(0, anchor.offsetTop - 16);
+        }
 
         if (isPhone) {
           const newPhone = eInp.value.replace(/\D/g, '').slice(0, 10);
@@ -1000,7 +1006,7 @@
           if (generation !== gen) return;
           renderOtpCard(nextOtpStep);
         }
-        setTimeout(() => { scrollToLastMsg(); updateScrollHint(); }, 100);
+        requestAnimationFrame(() => updateScrollHint());
       });
     });
 
