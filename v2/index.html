@@ -881,9 +881,12 @@
     hiddenInput.setAttribute('inputmode', 'numeric');
     hiddenInput.setAttribute('type', 'tel');
     hiddenInput.value = '';
-    // Move physically into activeCard so browser sees it as in-viewport
-    hiddenInput.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
-    activeCard.appendChild(hiddenInput);
+    // Use position:fixed;top:50% so layout reflows (from keyboard-height sync)
+    // don't physically move this element. iOS dismisses the keyboard whenever
+    // the focused input moves — fixed positioning prevents that.
+    // top:50% keeps it in the visual viewport so iOS won't try to scroll to it.
+    hiddenInput.style.cssText = 'position:fixed;top:50%;left:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+    activeCard.appendChild(hiddenInput); // keep inside activeCard for contains() checks
     let submitted = false;
 
     function updateBoxes() {
@@ -1794,19 +1797,11 @@
     const phone = document.querySelector('.phone');
     if (!phone) return;
 
-    // Debug overlay — shows live measurements so we can diagnose keyboard issues.
-    // Remove once the correct fix is confirmed.
-    const dbg = document.createElement('div');
-    dbg.id = 'kbDebug';
-    dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;padding:3px 8px;z-index:99999;text-align:center;font-family:monospace;pointer-events:none;';
-    document.body.appendChild(dbg);
-
     function sync() {
       const iH  = window.innerHeight;
       const vvH = window.visualViewport ? window.visualViewport.height : iH;
       const kbH = Math.max(0, iH - vvH);
       phone.style.paddingBottom = kbH + 'px';
-      dbg.textContent = `iH=${iH} vvH=${Math.round(vvH)} kb=${Math.round(kbH)} pb=${phone.style.paddingBottom}`;
     }
 
     if (window.visualViewport) {
