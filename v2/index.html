@@ -852,6 +852,7 @@
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
       otpCardActive = false;
+      window._otpKeyboardActive = false;
       hiddenInput.blur(); // dismiss numeric keyboard before edit sheet opens
       mainInput.blur();   // prevent mainInput from being auto-focused on iOS
       hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
@@ -886,9 +887,13 @@
     // dismisses the keyboard in Chrome (Safari/WKWebView are more lenient).
     // position:fixed;top:50% keeps it in the visual viewport so iOS won't try
     // to scroll to it, and layout reflows (paddingBottom sync) won't move it.
-    hiddenInput.style.cssText = 'position:fixed;top:50%;left:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
-    // Focus only if not already focused (maybePreFocusOtp may have done it already).
-    if (document.activeElement !== hiddenInput) hiddenInput.focus();
+    // Only restyle if not already focused — maybePreFocusOtp uses the identical
+    // style so there is zero geometry change, which avoids Chrome keyboard dismissal.
+    if (document.activeElement !== hiddenInput) {
+      hiddenInput.style.cssText = 'position:fixed;top:50%;left:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+      window._otpKeyboardActive = true;
+      hiddenInput.focus();
+    }
     // Closure flag — used by the touchstart guard instead of activeCard.contains().
     let otpCardActive = true;
     let submitted = false;
@@ -907,6 +912,7 @@
         setTimeout(() => {
           const code = hiddenInput.value;
           otpCardActive = false;
+          window._otpKeyboardActive = false;
           hiddenInput.blur(); // prevent numeric keyboard persisting after OTP
           hiddenInput.value = '';
           hiddenInput.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
@@ -1574,7 +1580,8 @@
       setTimeout(() => {
         if (generation !== gen) return;
         if (next.card) {
-          mainInput.blur(); // dismiss keyboard — card steps don't use the text input
+          // Only blur if mainInput actually has focus — don't disturb OTP pre-focus
+          if (document.activeElement === mainInput) mainInput.blur();
           renderCard(next);
         } else {
           applyStepToInput(next);
@@ -1599,8 +1606,11 @@
     otp.readOnly = false;
     otp.setAttribute('inputmode', 'numeric');
     otp.setAttribute('type', 'tel');
-    // Place it in-viewport so iOS treats it as a real focusable target
-    otp.style.cssText = 'position:fixed;bottom:50px;left:50%;transform:translateX(-50%);width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+    // Use the exact same style as renderOtpCard so the element never moves
+    // after focus. Chrome dismisses the keyboard when a focused input's geometry
+    // changes — keeping the style identical prevents that.
+    otp.style.cssText = 'position:fixed;top:50%;left:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;';
+    window._otpKeyboardActive = true; // freeze paddingBottom sync while OTP keyboard is active
     otp.focus();
   }
 
@@ -1825,6 +1835,9 @@
     document.body.appendChild(dbg);
 
     function sync() {
+      // Skip all layout changes while the OTP numeric keyboard is active.
+      // Any paddingBottom change during OTP can cause Chrome to dismiss the keyboard.
+      if (window._otpKeyboardActive) return;
       const iH  = window.innerHeight;
       const vvH = window.visualViewport ? window.visualViewport.height : iH;
       const vvOT = window.visualViewport ? window.visualViewport.offsetTop : 0;
