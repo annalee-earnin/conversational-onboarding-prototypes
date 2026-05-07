@@ -333,13 +333,6 @@
     }
     .otp-input-box.active { border-color: #111; background: #fff; }
     .otp-input-box.filled { background: rgba(0,0,0,0.06); border-color: transparent; }
-    /* Real <input> boxes — override browser defaults while keeping class visuals */
-    input.otp-input-box {
-      display: block; text-align: center; padding: 0;
-      outline: none; -webkit-appearance: none; appearance: none;
-      font-family: inherit; box-sizing: border-box;
-      caret-color: transparent; cursor: pointer;
-    }
     .otp-verify-btn {
       width: 100%; background: #000; color: #fff; border: none;
       border-radius: 100px; padding: 16px;
@@ -833,9 +826,9 @@
           countdown = 30;
           resendBtn.textContent = `Resend code (0:30)`;
           resendBtn.disabled = true;
-          // Clear all boxes and re-focus first on resend
-          boxInputs.forEach(b => { b.value = ''; });
-          boxInputs[0].focus();
+          otpOverlay.value = '';
+          updateBoxes();
+          otpOverlay.focus();
           const t2 = setInterval(() => {
             countdown--;
             if (countdown > 0) {
@@ -856,7 +849,7 @@
     editBtn.addEventListener('click', () => {
       clearInterval(timer);
       window._otpKeyboardActive = false;
-      boxInputs.forEach(b => b.blur());
+      otpOverlay.blur();
       mainInput.blur();
       activeCard.innerHTML = '';
       mainInputCard.style.display = '';
@@ -869,87 +862,75 @@
     pillRow.appendChild(editBtn);
     activeCard.appendChild(pillRow);
 
-    // Digit boxes — real <input type="tel"> elements so the browser keeps the
-    // keyboard open natively when the user taps them. Div boxes required JS
-    // touchstart/preventDefault tricks that Chrome on iOS still dismissed.
+    // Visual digit boxes (display-only divs) + a single transparent <input>
+    // overlay that physically covers the whole row.
+    //
+    // Why overlay: Chrome on iOS dismisses the keyboard when a touch ENDS on a
+    // non-input element. Making the boxes real <input> elements per-digit didn't
+    // help because Chrome still treated the inter-digit spaces as non-input. The
+    // overlay fills the entire hit area so every tap — start AND end — lands on
+    // a real <input>. Browser keeps keyboard open natively; no JS tricks needed.
     const boxesRow = document.createElement('div');
     boxesRow.className = 'otp-input-boxes';
-    const boxInputs = [0,1,2,3].map(i => {
-      const inp = document.createElement('input');
-      inp.type = 'tel';
-      inp.setAttribute('inputmode', 'numeric');
-      inp.maxLength = 1;
-      inp.setAttribute('pattern', '[0-9]*');
-      inp.className = 'otp-input-box' + (i === 0 ? ' active' : '');
-      boxesRow.appendChild(inp);
-      return inp;
+    boxesRow.style.position = 'relative';
+
+    const boxEls = [0,1,2,3].map(i => {
+      const box = document.createElement('div');
+      box.className = 'otp-input-box' + (i === 0 ? ' active' : '');
+      box.style.pointerEvents = 'none'; // taps fall through to the overlay
+      boxesRow.appendChild(box);
+      return box;
     });
+
+    // The overlay input — invisible but covers every tap on the box row
+    const otpOverlay = document.createElement('input');
+    otpOverlay.type = 'tel';
+    otpOverlay.setAttribute('inputmode', 'numeric');
+    otpOverlay.setAttribute('autocomplete', 'one-time-code');
+    otpOverlay.maxLength = 4;
+    otpOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0.01;font-size:16px;border:none;outline:none;background:transparent;color:transparent;caret-color:transparent;padding:0;margin:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;';
+    boxesRow.appendChild(otpOverlay);
     activeCard.appendChild(boxesRow);
 
     let submitted = false;
 
-    function getCode() {
-      return boxInputs.map(b => b.value.replace(/\D/g,'')).join('');
-    }
-
-    function updateBoxState() {
-      const code = getCode();
-      boxInputs.forEach((box, i) => {
-        box.classList.toggle('filled', !!box.value);
+    function updateBoxes() {
+      const val = otpOverlay.value.replace(/\D/g, '').slice(0, 4);
+      otpOverlay.value = val;
+      boxEls.forEach((box, i) => {
+        box.textContent = val[i] || '';
+        box.classList.toggle('filled', !!val[i]);
+        box.classList.toggle('active', i === val.length && val.length < 4);
       });
-      if (code.length >= 4 && !submitted) {
+      if (val.length >= 4 && !submitted) {
         submitted = true;
         clearInterval(timer);
         setTimeout(() => {
           window._otpKeyboardActive = false;
-          boxInputs.forEach(b => b.blur());
+          otpOverlay.blur();
           activeCard.innerHTML = '';
           mainInputCard.style.display = '';
           mainInput.disabled = false;
-          const code4 = code.slice(0,4);
-          if (step.onSubmit) step.onSubmit(code4);
+          if (step.onSubmit) step.onSubmit(val);
           if (step.postSubmit) step.postSubmit();
-          advanceFromCard(`${code4[0]} ${code4[1]} ${code4[2]} ${code4[3]}`);
+          advanceFromCard(`${val[0]} ${val[1]} ${val[2]} ${val[3]}`);
         }, 300);
       }
     }
 
-    boxInputs.forEach((inp, i) => {
-      inp.addEventListener('focus', () => {
-        boxInputs.forEach(b => b.classList.remove('active'));
-        inp.classList.add('active');
-      });
-      inp.addEventListener('input', () => {
-        inp.value = inp.value.replace(/\D/g,'').slice(-1);
-        if (inp.value && i < 3) boxInputs[i + 1].focus();
-        updateBoxState();
-      });
-      inp.addEventListener('keydown', e => {
-        if ((e.key === 'Backspace' || e.key === 'Delete') && !inp.value && i > 0) {
-          e.preventDefault();
-          boxInputs[i - 1].value = '';
-          boxInputs[i - 1].focus();
-          updateBoxState();
-        }
-      });
+    otpOverlay.addEventListener('input', updateBoxes);
+    otpOverlay.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
+
+    // SMS / clipboard paste — strip non-digits and fill
+    otpOverlay.addEventListener('paste', e => {
+      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 4);
+      if (text) { setTimeout(() => { otpOverlay.value = text; updateBoxes(); }, 0); }
     });
 
-    // SMS auto-fill via paste (also handles clipboard paste)
-    boxInputs[0].addEventListener('paste', e => {
-      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,4);
-      if (text) {
-        text.split('').forEach((ch, j) => { if (boxInputs[j]) boxInputs[j].value = ch; });
-        e.preventDefault();
-        const next = text.length < 4 ? boxInputs[text.length] : boxInputs[3];
-        next.focus();
-        updateBoxState();
-      }
-    });
-
-    // Focus first box — keyboard transfers from otpHidden (pre-focused in
-    // maybePreFocusOtp within the user gesture) without dismissing.
-    boxInputs[0].focus();
-    // Park the pre-focus helper off-screen now that a real box has focus
+    // Focus the overlay — keyboard transfers from otpHidden (pre-focused in
+    // maybePreFocusOtp within the user gesture) to this overlay without dismissing.
+    otpOverlay.focus();
+    // Park the pre-focus helper off-screen
     const otpH = document.getElementById('otpHidden');
     if (otpH) otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;';
   }
