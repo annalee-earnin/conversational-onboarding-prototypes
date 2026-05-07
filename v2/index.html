@@ -1792,13 +1792,33 @@
   // innerHeight already equals visualViewport.height → difference = 0 → no change.
   (function syncToVisualViewport() {
     const phone = document.querySelector('.phone');
-    if (!window.visualViewport || !phone) return;
+    if (!phone) return;
+
+    // Debug overlay — shows live measurements so we can diagnose keyboard issues.
+    // Remove once the correct fix is confirmed.
+    const dbg = document.createElement('div');
+    dbg.id = 'kbDebug';
+    dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;padding:3px 8px;z-index:99999;text-align:center;font-family:monospace;pointer-events:none;';
+    document.body.appendChild(dbg);
+
     function sync() {
-      const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.height);
-      phone.style.paddingBottom = kbHeight + 'px';
+      const iH  = window.innerHeight;
+      const vvH = window.visualViewport ? window.visualViewport.height : iH;
+      const kbH = Math.max(0, iH - vvH);
+      phone.style.paddingBottom = kbH + 'px';
+      dbg.textContent = `iH=${iH} vvH=${Math.round(vvH)} kb=${Math.round(kbH)} pb=${phone.style.paddingBottom}`;
     }
-    window.visualViewport.addEventListener('resize', sync);
-    window.visualViewport.addEventListener('scroll', sync);
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', sync);
+      window.visualViewport.addEventListener('scroll', sync);
+    }
+    // Fallback: window resize fires in many browsers on keyboard show/hide
+    window.addEventListener('resize', sync);
+    // Fallback: also sync when any input gains/loses focus
+    document.addEventListener('focusin',  () => { sync(); setTimeout(sync, 300); setTimeout(sync, 600); });
+    document.addEventListener('focusout', () => { setTimeout(sync, 300); });
+
     sync();
   })();
 
