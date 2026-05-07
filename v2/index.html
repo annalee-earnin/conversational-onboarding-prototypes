@@ -1810,9 +1810,8 @@
     }
     // Fallback: window resize fires in many browsers on keyboard show/hide
     window.addEventListener('resize', sync);
-    // Fallback: also sync when any input gains/loses focus
-    document.addEventListener('focusin',  () => { sync(); setTimeout(sync, 300); setTimeout(sync, 600); });
-    document.addEventListener('focusout', () => { setTimeout(sync, 300); });
+    // Note: focusin/focusout listeners were removed — they called sync() during
+    // the keyboard animation, causing layout shifts that made iOS dismiss the keyboard.
 
     sync();
   })();
