@@ -16,7 +16,9 @@
     body { font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif; }
 
     .phone {
-      position: fixed; inset: 0;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 100vh; /* fallback — JS overrides via visualViewport */
       background: #FBEA6B;
       display: flex; flex-direction: column; overflow: hidden;
     }
@@ -1778,6 +1780,22 @@
 
   // Prevent WKWebView bounce scroll
   window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
+
+  // Keep the layout above the soft keyboard (and its toolbar) in browsers.
+  // visualViewport.height reports the fully-visible area, excluding both the
+  // keyboard and the autocomplete/Done toolbar above it.
+  // In WKWebView the viewport is already keyboard-aware, so this is a no-op there.
+  (function syncToVisualViewport() {
+    const phone = document.querySelector('.phone');
+    if (!window.visualViewport || !phone) return;
+    function sync() {
+      phone.style.height = window.visualViewport.height + 'px';
+      phone.style.top    = window.visualViewport.offsetTop + 'px';
+    }
+    window.visualViewport.addEventListener('resize', sync);
+    window.visualViewport.addEventListener('scroll', sync);
+    sync();
+  })();
 
   boot();
 </script>
