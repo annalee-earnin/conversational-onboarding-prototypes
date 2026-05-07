@@ -1666,6 +1666,7 @@
       const errMsg = typeof step.errorMsg === 'function' ? step.errorMsg(text) : step.errorMsg;
       await addBotMsg(errMsg);
       mainInput.focus();
+      scrollToLastMsg();
       // Re-arm oninput so the send button works again
       mainInput.oninput = () => { sendBtn.disabled = mainInput.value.trim().length < 1; };
       return;
