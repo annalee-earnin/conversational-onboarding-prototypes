@@ -2548,6 +2548,37 @@
       }
     }
   });
+
+  // ── Sync .phone to visual viewport so input stays above soft keyboard ──
+  // keyboard height = window.innerHeight − visualViewport.height.
+  // In WKWebView the view already shrinks on keyboard open, so difference = 0.
+  (function syncToVisualViewport() {
+    const phone = document.querySelector('.phone');
+    if (!phone) return;
+
+    function sync() {
+      const iH  = window.innerHeight;
+      const vvH = window.visualViewport ? window.visualViewport.height : iH;
+      const kbH = Math.max(0, iH - vvH);
+      phone.style.paddingBottom = kbH + 'px';
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', sync);
+      window.visualViewport.addEventListener('scroll', sync);
+    }
+    window.addEventListener('resize', sync);
+
+    document.addEventListener('focusin', () => {
+      setTimeout(sync, 300);
+      setTimeout(sync, 600);
+    });
+    document.addEventListener('focusout', () => {
+      setTimeout(sync, 300);
+    });
+
+    sync();
+  })();
 </script>
 </body>
 </html>

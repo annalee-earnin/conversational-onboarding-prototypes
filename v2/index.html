@@ -610,6 +610,7 @@
     // ── 9: Email ─────────────────────────────────────────────────────────────
     {
       botMsg: "What's your email? This will help add an extra layer of security to your account.",
+      inputmode: 'email',
       validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()),
       errorMsg: () => "That email doesn't look quite right — make sure it has an @ and a domain, like you@example.com. Want to try again?",
       onSubmit(v) { state.email = v.trim(); },
@@ -1230,9 +1231,15 @@
       if (!m) return dob;
       return `${months[parseInt(m[1]) - 1]} ${parseInt(m[2])}, ${m[3].length === 2 ? '19' + m[3] : m[3]}`;
     }
+    function toTitleCase(s) {
+      return s.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    }
     function splitName(full) {
       const parts = full.trim().split(/\s+/);
-      return { first: parts[0] || '', last: parts.slice(1).join(' ') };
+      return {
+        first: toTitleCase(parts[0] || ''),
+        last:  toTitleCase(parts.slice(1).join(' '))
+      };
     }
     function makeLabel(text) {
       const l = document.createElement('div');
@@ -1481,11 +1488,11 @@
       case 'continue':    renderContinueCard();        break;
       case 'done':        renderDoneCard();           break;
     }
-    // Call twice: rAF catches most cases; the setTimeout catches cases where
-    // inserting card content changes the chatScroll height (e.g. QR buttons
-    // shrinking chatScroll so a long T&C message now overflows).
-    requestAnimationFrame(() => updateScrollHint());
-    setTimeout(() => updateScrollHint(), 200);
+    // Scroll so the last bot message end is visible above the card area,
+    // then update the scroll hint. rAF + setTimeout covers cases where
+    // card insertion changes chatScroll's height before we measure.
+    requestAnimationFrame(() => { scrollToLastMsg(); updateScrollHint(); });
+    setTimeout(() => { scrollToLastMsg(); updateScrollHint(); }, 200);
   }
 
   // ── Input setup ───────────────────────────────────────────────────────────
@@ -1494,7 +1501,17 @@
     mainInputCard.style.display = '';   // restore if hidden by QR/verify step
     mainInput.type = 'text';
     mainInput.placeholder = 'Reply here';
-    mainInput.setAttribute('autocapitalize', 'sentences');
+    mainInput.removeAttribute('inputmode');
+    mainInput.removeAttribute('maxlength');
+    mainInput.removeAttribute('autocomplete');
+    if (step.inputmode) {
+      mainInput.setAttribute('inputmode', step.inputmode);
+      mainInput.setAttribute('autocapitalize', 'none');
+      mainInput.setAttribute('autocorrect', 'off');
+    } else {
+      mainInput.setAttribute('autocapitalize', 'sentences');
+      mainInput.removeAttribute('autocorrect');
+    }
     mainInput.value = '';
     mainInput.disabled = false;
     sendBtn.disabled = true;
@@ -1592,6 +1609,7 @@
           renderCard(next);
         } else {
           applyStepToInput(next);
+          scrollToLastMsg();
           requestAnimationFrame(() => updateScrollHint());
         }
       }, 150);
@@ -1840,32 +1858,27 @@
   // keyboard height = window.innerHeight − visualViewport.height.
   // In WKWebView the app resizes the WebView when the keyboard appears, so
   // innerHeight already equals visualViewport.height → difference = 0 → no change.
+  // Scroll chatScroll so the bottom of the last bot message is visible just
+  // above the card area — only scrolls if the message end is currently hidden.
+  function scrollToLastMsg() {
+    const bubbles = chatScroll.querySelectorAll('.bubble-bot, .bubble-bot-hero');
+    const last = bubbles[bubbles.length - 1];
+    if (!last) return;
+    const target = last.offsetTop + last.offsetHeight - chatScroll.clientHeight + 24;
+    if (target > chatScroll.scrollTop) {
+      chatScroll.scrollTo({ top: target, behavior: 'smooth' });
+    }
+  }
+
   (function syncToVisualViewport() {
     const phone = document.querySelector('.phone');
     if (!phone) return;
 
-    // Debug overlay — shows live viewport measurements so we can debug
-    // Chrome vs Safari differences. Remove once the fix is confirmed.
-    const dbg = document.createElement('div');
-    dbg.id = 'vp-debug';
-    Object.assign(dbg.style, {
-      position: 'fixed', bottom: '0', left: '0', right: '0', zIndex: '99999',
-      background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '11px',
-      fontFamily: 'monospace', padding: '4px 8px', pointerEvents: 'none',
-      whiteSpace: 'pre'
-    });
-    document.body.appendChild(dbg);
-
     function sync() {
-      // Skip all layout changes while the OTP numeric keyboard is active.
-      // Any paddingBottom change during OTP can cause Chrome to dismiss the keyboard.
       const iH  = window.innerHeight;
       const vvH = window.visualViewport ? window.visualViewport.height : iH;
-      const vvOT = window.visualViewport ? window.visualViewport.offsetTop : 0;
       const kbH = Math.max(0, iH - vvH);
       phone.style.paddingBottom = kbH + 'px';
-      dbg.textContent =
-        `iH=${iH}  vvH=${Math.round(vvH)}  vvOT=${Math.round(vvOT)}  kb=${kbH}  pb=${phone.style.paddingBottom}`;
     }
 
     if (window.visualViewport) {
@@ -1874,13 +1887,8 @@
     }
     window.addEventListener('resize', sync);
 
-    // Delayed syncs ensure padding is applied after the keyboard finishes
-    // animating in. Sync runs on ALL focus changes — the OTP field needs to be
-    // pushed above the keyboard, not hidden behind it (Chrome dismisses keyboard
-    // when the focused element is occluded).
     document.addEventListener('focusin', () => {
-      setTimeout(sync, 300);
-      setTimeout(sync, 600);
+      setTimeout(() => { sync(); scrollToLastMsg(); }, 300);
     });
     document.addEventListener('focusout', () => {
       setTimeout(sync, 300);
