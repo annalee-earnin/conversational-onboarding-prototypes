@@ -803,6 +803,16 @@
     mainInputCard.style.display = 'none';
     activeCard.innerHTML = '';
 
+    // Ensure nothing is focused when the OTP card appears — the overlay must
+    // receive focus from the user's own tap, not programmatically.
+    // Programmatic focus causes Chrome to dismiss the keyboard on touchend.
+    const otpH = document.getElementById('otpHidden');
+    if (otpH) { otpH.blur(); otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;'; }
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+    window._otpKeyboardActive = true; // freeze paddingBottom sync for OTP lifetime
+
     const isPhone = step.otpType === 'phone';
 
     // Pill buttons: Resend + Edit
@@ -926,18 +936,7 @@
       if (text) { setTimeout(() => { otpOverlay.value = text; updateBoxes(); }, 0); }
     });
 
-    // Do NOT call otpOverlay.focus() here.
-    //
-    // Chrome on iOS dismisses the keyboard on touchend when the input was
-    // focused programmatically. The only way the keyboard stays is when the
-    // input gets focus directly from the user's own tap.
-    //
-    // Leaving the overlay unfocused means the user's first tap naturally
-    // establishes focus — Chrome owns that focus, so the keyboard persists.
-    //
-    // Park the pre-focus helper so it doesn't intercept any remaining input
-    const otpH = document.getElementById('otpHidden');
-    if (otpH) { otpH.blur(); otpH.style.cssText = 'position:fixed;top:-100px;left:0;opacity:0;font-size:16px;'; }
+    // Do NOT call otpOverlay.focus() — keyboard must come from user's own tap.
   }
 
   // ── TC cards ──────────────────────────────────────────────────────────────
@@ -1609,15 +1608,12 @@
   sendBtn.addEventListener('click', () => {
     const v = mainInput.value.trim();
     if (!v || sendBtn.disabled) return;
-    maybePreFocusOtp(v); // must run inside user-gesture so Chrome opens numeric keyboard
     advanceText(v);
   });
   mainInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !sendBtn.disabled) {
       e.preventDefault();
-      const v = mainInput.value.trim();
-      maybePreFocusOtp(v);
-      advanceText(v);
+      advanceText(mainInput.value.trim());
     }
   });
 
