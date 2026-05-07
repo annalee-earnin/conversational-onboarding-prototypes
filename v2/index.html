@@ -916,10 +916,14 @@
 
     hiddenInput.addEventListener('input', updateBoxes);
     hiddenInput.addEventListener('keydown', () => setTimeout(updateBoxes, 0));
-    // Tapping anywhere on the boxes row or the card area re-focuses the input
+    // Tapping anywhere on the boxes row or the card area re-focuses the input.
+    // The activeCard listener guards on activeCard.contains(hiddenInput) so it
+    // does NOT fire after the OTP card is torn down (hiddenInput moves to body).
     boxesRow.addEventListener('click', () => hiddenInput.focus());
     boxesRow.addEventListener('touchstart', () => hiddenInput.focus(), { passive: true });
-    activeCard.addEventListener('touchstart', () => hiddenInput.focus(), { passive: true });
+    activeCard.addEventListener('touchstart', () => {
+      if (activeCard.contains(hiddenInput)) hiddenInput.focus();
+    }, { passive: true });
     updateBoxes();
   }
 
@@ -1023,7 +1027,14 @@
     const container = document.createElement('div');
     container.className = 'quick-replies';
 
-    step.options.forEach((opt, idx) => {
+    // Always render primary (filled) button last so it sits at the bottom
+    const sortedOptions = [...step.options].sort((a, b) => {
+      const aP = typeof a === 'object' && a.primary ? 1 : 0;
+      const bP = typeof b === 'object' && b.primary ? 1 : 0;
+      return aP - bP;
+    });
+
+    sortedOptions.forEach((opt, idx) => {
       const label   = typeof opt === 'string' ? opt : opt.label;
       const primary = typeof opt === 'object' && opt.primary;
       const btn = document.createElement('button');
