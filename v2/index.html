@@ -569,7 +569,13 @@
       options: ['How does Cash Out work?', { label: 'Get started with Cash Out', primary: true }],
       onSubmit() {},
     },
-    // ── 4: Name ───────────────────────────────────────────────────────────────
+    // ── 4: Attribution ───────────────────────────────────────────────────────
+    {
+      botMsg: "Before we dive in — how did you hear about us?",
+      skipable: true,
+      onSubmit() {},
+    },
+    // ── 5: Name ───────────────────────────────────────────────────────────────
     {
       botMsg: "Perfect, let's get you set up! First, what's your legal first and last name?\n\nEnter it as it appears on your ID.",
       placeholder: "First and last name",
@@ -581,18 +587,13 @@
     },
     // ── 5: Date of birth ─────────────────────────────────────────────────────
     {
-      botMsg: s => `Hi ${s.name.split(' ')[0]}! 👋\n\nNext up — your date of birth. I use this to confirm you meet the age requirement to use EarnIn.\n\n🔒 Your data is encrypted and never sold or shared.`,
+      botMsg: s => `Hi ${s.name.split(' ')[0]}! 👋\n\nNext up — your date of birth. We use this to verify your age and confirm your identity.\n\n🔒 Your data is encrypted and never sold or shared.`,
       onSubmit(v) { state.dob = parseDOB(v.trim()) || v.trim(); },
-    },
-    // ── 6: Verify info card ───────────────────────────────────────────────────
-    {
-      botMsg: "Let me confirm what I have so far.",
-      card: 'verify',
-      onSubmit() {},
     },
     // ── 7: Phone ─────────────────────────────────────────────────────────────
     {
       botMsg: "Perfect! What's your phone number? I'll text you a verification code.",
+      inputmode: 'tel',
       validate: v => v.replace(/\D/g,'').length === 10,
       errorMsg: () => "Hmm, that doesn't look right — I need a 10-digit US number. Could you try again? (e.g. 555-867-5309)",
       onSubmit(v) { state.phone = v.replace(/\D/g,'').slice(0,10); },
@@ -616,14 +617,11 @@
       onSubmit(v) { state.email = v.trim(); },
       postSubmit() { emailBubbleEl = lastUserBubble; },
     },
-    // ── 10: Email OTP ─────────────────────────────────────────────────────────
+    // ── 10: Verify info card ──────────────────────────────────────────────────
     {
-      botMsg: s => `Got it! I sent a verification code to ${s.email}. Check your inbox — if you don't see it, look in spam.`,
-      card: 'otp',
-      otpType: 'email',
-      subtitle: () => state.email,
+      botMsg: "Before moving on, here's what I have — let me know if anything looks off.",
+      card: 'verify',
       onSubmit() {},
-      postSubmit() {},
     },
     // ── 11: TC1 — Electronic Communications ──────────────────────────────────
     {
@@ -660,26 +658,27 @@
       options: [{ label: 'Yes, sign me up', primary: true }, 'No thanks'],
       onSubmit() {},
     },
-    // ── 14: Push notifications ────────────────────────────────────────────────
+    // ── 14: Success + push notifications ─────────────────────────────────────
     {
-      botMsg: "Would you like to enable push notifications so I can keep you updated?",
+      gifMsg: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
+      botMsg: "🎉 Your EarnIn account is created!",
+      followUp: "Would you like to enable push notifications so I can keep you updated?",
       card: 'quick',
       options: [{ label: 'Yes, notify me', primary: true }, 'Not now'],
       requestPermission: true,
       onSubmit() {},
     },
-    // ── 15: Attribution ───────────────────────────────────────────────────────
+    // ── 15: What's next ───────────────────────────────────────────────────────
     {
-      botMsg: "One last thing. How did you hear about EarnIn?",
-      card: 'attribution',
+      preBotMsg: "Here's what to do to finish setting up your account:",
+      botMsg: "**Connect your bank** 🏦\nLink your checking account so we can see your earnings and set your Cash Out limit.\n\n**Verify your employment** 💼\nConfirm where you work to unlock your full advance amount.\n\n**Cash Out** 💸\nAccess up to $150 of the pay you've already earned — before payday, no interest, no mandatory fees.",
+      followUp: "Ready to get started?",
+      card: 'quick',
+      options: [{ label: "Let's go", primary: true }],
       onSubmit() {},
     },
-    // ── 16: Done ─────────────────────────────────────────────────────────────
-    {
-      gifMsg: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
-      botMsg: "🎉 Your EarnIn account is created!\n\nHere's what's next:\n\n1. Connect your bank account\n2. Verify your employment\n3. Cash Out your first advance",
-      card: 'continue',
-    },
+    // ── 16: Terminal — restore input after final QR ───────────────────────────
+    { onSubmit() {} },
   ];
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -695,11 +694,12 @@
   function typeText(el, text, outerEl, autoScroll) {
     return new Promise(resolve => {
       const tokens = [];
-      const re = /(\n\n|\[([^\]]+)\]\(([^)]+)\))/g;
+      const re = /(\n\n|\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*)/g;
       let pos = 0, m;
       while ((m = re.exec(text)) !== null) {
         for (let i = pos; i < m.index; i++) tokens.push({ t: 'c', v: text[i] });
         if (m[0] === '\n\n') tokens.push({ t: 'br' });
+        else if (m[4] !== undefined) tokens.push({ t: 'b', v: m[4] });
         else tokens.push({ t: 'a', label: m[2], url: m[3] });
         pos = m.index + m[0].length;
       }
@@ -718,6 +718,10 @@
         } else if (tok.t === 'br') {
           el.appendChild(document.createElement('br'));
           el.appendChild(document.createElement('br'));
+        } else if (tok.t === 'b') {
+          const strong = document.createElement('strong');
+          strong.textContent = tok.v;
+          el.appendChild(strong);
         } else {
           const a = document.createElement('a');
           a.href = tok.url; a.target = '_blank';
@@ -1626,7 +1630,7 @@
     if (!step || step.card) return;
     mainInputCard.style.display = '';   // restore if hidden by QR/verify step
     mainInput.type = 'text';
-    mainInput.placeholder = 'Reply here';
+    mainInput.placeholder = step.placeholder || 'Reply here';
     mainInput.removeAttribute('inputmode');
     mainInput.removeAttribute('maxlength');
     mainInput.removeAttribute('autocomplete');
@@ -1644,6 +1648,24 @@
     mainInput.oninput = () => {
       sendBtn.disabled = mainInput.value.trim().length < 1;
     };
+
+    // Skip quick reply for steps that allow skipping — same container/style as renderQuickReplies
+    if (step.skipable) {
+      activeCard.innerHTML = '';
+      const container = document.createElement('div');
+      container.className = 'quick-replies';
+      const skipBtn = document.createElement('button');
+      skipBtn.className = 'quick-reply-btn';
+      skipBtn.textContent = 'Skip';
+      skipBtn.style.cssText = 'opacity:0;transform:translateY(4px);transition:opacity 0.2s,transform 0.2s;';
+      skipBtn.addEventListener('click', () => {
+        activeCard.innerHTML = '';
+        advanceText('Skip');
+      });
+      container.appendChild(skipBtn);
+      activeCard.appendChild(container);
+      requestAnimationFrame(() => { skipBtn.style.opacity = '1'; skipBtn.style.transform = 'translateY(0)'; });
+    }
   }
 
   // ── Advance ───────────────────────────────────────────────────────────────
@@ -1659,6 +1681,7 @@
     mainInput.oninput = null;
     sendBtn.disabled = true;
     addUserMsg(text);
+    activeCard.innerHTML = '';  // clear skipable QR chips AFTER bubble is in DOM
     requestAnimationFrame(() => scrollToBubbleTop(lastUserBubble));
 
     // Validate — if it fails, show friendly bot retry and re-arm input
@@ -1666,7 +1689,16 @@
       const errMsg = typeof step.errorMsg === 'function' ? step.errorMsg(text) : step.errorMsg;
       await addBotMsg(errMsg);
       mainInput.focus();
-      scrollToLastMsg();
+      // Force-scroll after 350ms so the keyboard has reopened and
+      // chatScroll.clientHeight reflects the keyboard-reduced height.
+      setTimeout(() => {
+        const all = chatScroll.querySelectorAll('.bubble-bot, .bubble-bot-hero');
+        const errBubble = all[all.length - 1];
+        if (errBubble) {
+          const target = errBubble.offsetTop + errBubble.offsetHeight - chatScroll.clientHeight + 24;
+          chatScroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }
+      }, 350);
       // Re-arm oninput so the send button works again
       mainInput.oninput = () => { sendBtn.disabled = mainInput.value.trim().length < 1; };
       return;
@@ -1969,7 +2001,7 @@
     boot();
   }
 
-  document.getElementById('restartBtn').addEventListener('click', restart);
+  document.getElementById('restartBtn').addEventListener('click', () => window.location.reload());
 
   // Prevent WKWebView bounce scroll
   window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
